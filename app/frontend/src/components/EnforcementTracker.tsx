@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useApi } from "../hooks/useApi";
+import { LoadingPage } from "./LoadingSkeleton";
 
 interface EnforcementData {
   records: Record<string, string>[];
@@ -30,7 +31,7 @@ export default function EnforcementTracker() {
 
   const { data, loading } = useApi<EnforcementData>("/api/enforcement", params);
 
-  if (loading) return <div className="loading-spinner">Loading enforcement data...</div>;
+  if (loading) return <LoadingPage />;
 
   const summary = data?.summary || {};
 

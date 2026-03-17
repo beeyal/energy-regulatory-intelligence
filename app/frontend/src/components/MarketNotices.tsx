@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useApi } from "../hooks/useApi";
+import { LoadingPage } from "./LoadingSkeleton";
 
 interface NoticesData {
   records: Record<string, string>[];
@@ -30,17 +31,28 @@ function formatDate(d: string | null): string {
   }
 }
 
+const PAGE_SIZE = 25;
+
 export default function MarketNotices() {
   const [noticeType, setNoticeType] = useState("");
   const [region, setRegion] = useState("");
+  const [page, setPage] = useState(0);
 
-  const params: Record<string, string> = {};
+  const params: Record<string, string> = { limit: "200" };
   if (noticeType) params.notice_type = noticeType;
   if (region) params.region = region;
 
   const { data, loading } = useApi<NoticesData>("/api/market-notices", params);
 
-  if (loading) return <div className="loading-spinner">Loading market notices...</div>;
+  const paginatedRecords = useMemo(() => {
+    if (!data?.records) return [];
+    const start = page * PAGE_SIZE;
+    return data.records.slice(start, start + PAGE_SIZE);
+  }, [data, page]);
+
+  const totalPages = Math.ceil((data?.records?.length || 0) / PAGE_SIZE);
+
+  if (loading) return <LoadingPage />;
 
   return (
     <div>
@@ -58,7 +70,7 @@ export default function MarketNotices() {
           <button
             key={t}
             className={`filter-btn ${(t === "All" ? !noticeType : noticeType === t) ? "active" : ""}`}
-            onClick={() => setNoticeType(t === "All" ? "" : t)}
+            onClick={() => { setNoticeType(t === "All" ? "" : t); setPage(0); }}
           >
             {t === "All" ? "All Types" : t}
           </button>
@@ -69,7 +81,7 @@ export default function MarketNotices() {
           <button
             key={r}
             className={`filter-btn ${(r === "All" ? !region : region === r) ? "active" : ""}`}
-            onClick={() => setRegion(r === "All" ? "" : r)}
+            onClick={() => { setRegion(r === "All" ? "" : r); setPage(0); }}
           >
             {r}
           </button>
@@ -95,7 +107,7 @@ export default function MarketNotices() {
               </tr>
             </thead>
             <tbody>
-              {data?.records?.map((r, i) => (
+              {paginatedRecords.map((r, i) => (
                 <tr key={i}>
                   <td className="number">{r.notice_id}</td>
                   <td>
@@ -115,6 +127,27 @@ export default function MarketNotices() {
             </tbody>
           </table>
         </div>
+        {totalPages > 1 && (
+          <div className="pagination">
+            <button
+              className="page-btn"
+              disabled={page === 0}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              Previous
+            </button>
+            <span className="page-info">
+              Page {page + 1} of {totalPages} ({data?.records?.length} notices)
+            </span>
+            <button
+              className="page-btn"
+              disabled={page >= totalPages - 1}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+            </button>
+          </div>
+        )}
         {(!data?.records || data.records.length === 0) && (
           <div className="empty-state">No notices match the current filters.</div>
         )}

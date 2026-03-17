@@ -3,6 +3,7 @@ API routes for the Energy Compliance Intelligence Hub.
 """
 
 import logging
+import re
 from typing import Optional
 
 from fastapi import APIRouter, Query
@@ -14,6 +15,13 @@ from .llm import chat
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
+
+
+# ── Input sanitisation ──────────────────────────────────────────────────────
+
+def _sanitize(val: str) -> str:
+    """Strip SQL injection characters. Allow alphanumeric, spaces, hyphens, dots."""
+    return re.sub(r"[^a-zA-Z0-9 \-\.]", "", val)
 
 
 # ── Request/Response models ──────────────────────────────────────────────────
@@ -38,9 +46,9 @@ def emissions_overview(
     """Top emitters with optional state/fuel filters."""
     where_clauses = []
     if state:
-        where_clauses.append(f"LOWER(state) = LOWER('{state}')")
+        where_clauses.append(f"LOWER(state) = LOWER('{_sanitize(state)}')")
     if fuel_source:
-        where_clauses.append(f"LOWER(primary_fuel_source) LIKE LOWER('%{fuel_source}%')")
+        where_clauses.append(f"LOWER(primary_fuel_source) LIKE LOWER('%{_sanitize(fuel_source)}%')")
     where = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
     sql = f"""
@@ -78,9 +86,9 @@ def market_notices(
     """Recent AEMO market notices with filters."""
     where_clauses = []
     if notice_type:
-        where_clauses.append(f"notice_type = '{notice_type}'")
+        where_clauses.append(f"notice_type = '{_sanitize(notice_type)}'")
     if region:
-        where_clauses.append(f"region = '{region}'")
+        where_clauses.append(f"region = '{_sanitize(region)}'")
     where = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
     sql = f"""
@@ -115,15 +123,15 @@ def enforcement(
     """AER enforcement actions with filters."""
     where_clauses = []
     if company:
-        where_clauses.append(f"LOWER(company_name) LIKE LOWER('%{company}%')")
+        where_clauses.append(f"LOWER(company_name) LIKE LOWER('%{_sanitize(company)}%')")
     if action_type:
-        where_clauses.append(f"action_type = '{action_type}'")
+        where_clauses.append(f"action_type = '{_sanitize(action_type)}'")
     if breach_type:
-        where_clauses.append(f"breach_type = '{breach_type}'")
+        where_clauses.append(f"breach_type = '{_sanitize(breach_type)}'")
     where = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
     allowed_sorts = ["penalty_aud", "action_date", "company_name"]
-    sort_col = sort_by if sort_by in allowed_sorts else "penalty_aud"
+    sort_col = _sanitize(sort_by) if sort_by in allowed_sorts else "penalty_aud"
 
     sql = f"""
         SELECT action_id, company_name, action_date, action_type, breach_type,
@@ -160,16 +168,17 @@ def obligations(
     """Regulatory obligations register with search."""
     where_clauses = []
     if regulatory_body:
-        where_clauses.append(f"regulatory_body = '{regulatory_body}'")
+        where_clauses.append(f"regulatory_body = '{_sanitize(regulatory_body)}'")
     if category:
-        where_clauses.append(f"category = '{category}'")
+        where_clauses.append(f"category = '{_sanitize(category)}'")
     if risk_rating:
-        where_clauses.append(f"risk_rating = '{risk_rating}'")
+        where_clauses.append(f"risk_rating = '{_sanitize(risk_rating)}'")
     if search:
+        safe_search = _sanitize(search)
         where_clauses.append(
-            f"(LOWER(obligation_name) LIKE LOWER('%{search}%') "
-            f"OR LOWER(description) LIKE LOWER('%{search}%') "
-            f"OR LOWER(source_legislation) LIKE LOWER('%{search}%'))"
+            f"(LOWER(obligation_name) LIKE LOWER('%{safe_search}%') "
+            f"OR LOWER(description) LIKE LOWER('%{safe_search}%') "
+            f"OR LOWER(source_legislation) LIKE LOWER('%{safe_search}%'))"
         )
     where = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
@@ -215,6 +224,48 @@ def compliance_gaps():
         grouped.setdefault(t, []).append(row)
 
     return {"insights": rows, "grouped": grouped}
+
+
+@router.get("/metadata")
+def metadata():
+    """Data freshness and source metadata."""
+    tables = [
+        "emissions_data",
+        "market_notices",
+        "enforcement_actions",
+        "regulatory_obligations",
+        "compliance_insights",
+    ]
+    counts = {}
+    for t in tables:
+        rows = execute_query(f"SELECT COUNT(*) as cnt FROM {get_fqn(t)}")
+        counts[t] = rows[0]["cnt"] if rows else "0"
+    return {
+        "tables": counts,
+        "catalog": get_fqn("").rsplit(".", 1)[0],
+        "data_sources": {
+            "emissions": {
+                "source": "CER NGER Reporting",
+                "period": "2023-24 / 2024-25",
+                "type": "Approximate (from published CER summaries)",
+            },
+            "market_notices": {
+                "source": "AEMO NEMWeb",
+                "period": "Jan 2024 – Mar 2025",
+                "type": "Generated from real notice patterns",
+            },
+            "enforcement": {
+                "source": "AER Compliance Reports",
+                "period": "2019 – 2024",
+                "type": "Curated from published enforcement data",
+            },
+            "obligations": {
+                "source": "NER, NERL, NERR, NGER Act, ESA",
+                "period": "Current",
+                "type": "Verified regulatory obligations",
+            },
+        },
+    }
 
 
 @router.post("/chat", response_model=ChatResponse)

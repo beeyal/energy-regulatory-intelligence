@@ -14,6 +14,13 @@ from .db import execute_query
 logger = logging.getLogger(__name__)
 
 
+# ── Input sanitisation ──────────────────────────────────────────────────────
+
+def _sanitize(val: str) -> str:
+    """Strip SQL injection characters. Allow alphanumeric, spaces, hyphens, dots."""
+    return re.sub(r"[^a-zA-Z0-9 \-\.]", "", val)
+
+
 # ── Intent classification ────────────────────────────────────────────────────
 
 INTENT_PATTERNS = {
@@ -84,11 +91,12 @@ def _build_context_query(intent: str, message: str) -> str:
     if intent == "emissions":
         # Check if they want a specific state
         state_match = re.search(r"\b(nsw|vic|qld|sa|wa|tas|nt|act)\b", msg_lower)
-        state_filter = f"WHERE LOWER(state) = '{state_match.group(1)}'" if state_match else ""
+        state_filter = f"WHERE LOWER(state) = '{_sanitize(state_match.group(1))}'" if state_match else ""
 
         fuel_match = re.search(r"\b(coal|gas|hydro|wind|solar)\b", msg_lower)
         if fuel_match:
-            fuel_filter = f"{'WHERE' if not state_filter else 'AND'} LOWER(primary_fuel_source) LIKE '%{fuel_match.group(1)}%'"
+            safe_fuel = _sanitize(fuel_match.group(1))
+            fuel_filter = f"{'WHERE' if not state_filter else 'AND'} LOWER(primary_fuel_source) LIKE '%{safe_fuel}%'"
             state_filter += fuel_filter
 
         return f"""
@@ -116,7 +124,7 @@ def _build_context_query(intent: str, message: str) -> str:
 
         region_match = re.search(r"\b(nsw1?|vic1?|qld1?|sa1|tas1)\b", msg_lower)
         if region_match:
-            region = region_match.group(1).upper()
+            region = _sanitize(region_match.group(1).upper())
             if not region.endswith("1") and region in ("NSW", "VIC", "QLD"):
                 region += "1"
             region_clause = f"notice_type IS NOT NULL AND region = '{region}'"
@@ -141,11 +149,12 @@ def _build_context_query(intent: str, message: str) -> str:
 
     elif intent == "obligations":
         body_match = re.search(r"\b(aemo|aer|cer|esv)\b", msg_lower)
-        body_filter = f"WHERE LOWER(regulatory_body) = '{body_match.group(1)}'" if body_match else ""
+        body_filter = f"WHERE LOWER(regulatory_body) = '{_sanitize(body_match.group(1))}'" if body_match else ""
 
         cat_match = re.search(r"\b(market|safety|environment|technical|financial|consumer)\b", msg_lower)
         if cat_match:
-            cat_clause = f"LOWER(category) = '{cat_match.group(1)}'"
+            safe_cat = _sanitize(cat_match.group(1))
+            cat_clause = f"LOWER(category) = '{safe_cat}'"
             body_filter = f"WHERE {cat_clause}" if not body_filter else f"{body_filter} AND {cat_clause}"
 
         return f"""
@@ -166,17 +175,18 @@ def _build_context_query(intent: str, message: str) -> str:
                 break
 
         if company:
+            safe_company = _sanitize(company)
             return f"""
                 SELECT 'enforcement' as source, company_name as entity,
                        action_type as detail, penalty_aud as metric, action_date as date_val
                 FROM {get_fqn('enforcement_actions')}
-                WHERE LOWER(company_name) LIKE '%{company}%'
+                WHERE LOWER(company_name) LIKE '%{safe_company}%'
                 UNION ALL
                 SELECT 'emissions' as source, corporation_name as entity,
                        CONCAT('Scope 1: ', CAST(scope1_emissions_tco2e AS STRING), ' tCO2e') as detail,
                        scope1_emissions_tco2e as metric, NULL as date_val
                 FROM {get_fqn('emissions_data')}
-                WHERE LOWER(corporation_name) LIKE '%{company}%'
+                WHERE LOWER(corporation_name) LIKE '%{safe_company}%'
                 LIMIT 20
             """
 
@@ -218,6 +228,7 @@ def chat(message: str) -> str:
 
     # Build and execute context query
     sql = _build_context_query(intent, message)
+    rows = []
     try:
         rows = execute_query(sql)
         if rows:
@@ -256,8 +267,25 @@ def chat(message: str) -> str:
 
     except Exception as e:
         logger.error(f"LLM call failed: {e}")
-        # Fallback: return raw data summary
+        # Fallback: return formatted data summary as a markdown table
         if rows:
-            return f"**Query Results ({intent})**\n\nFound {len(rows)} records. Here are the highlights:\n\n" + \
-                   "\n".join(f"- {list(r.values())[0]}: {list(r.values())[1] if len(r) > 1 else ''}" for r in rows[:10])
+            headers = list(rows[0].keys())
+            display_rows = rows[:10]
+
+            # Build markdown table
+            header_line = "| " + " | ".join(headers) + " |"
+            separator = "| " + " | ".join("---" for _ in headers) + " |"
+            data_lines = []
+            for r in display_rows:
+                data_lines.append("| " + " | ".join(str(r.get(h, "")) for h in headers) + " |")
+
+            table = "\n".join([header_line, separator] + data_lines)
+
+            return (
+                f"**Query Results — {intent.replace('_', ' ').title()}**\n\n"
+                f"The LLM service is temporarily unavailable. "
+                f"Below is a summary of the {len(rows)} matching record(s) retrieved from the database.\n\n"
+                f"{table}\n\n"
+                f"*Showing {len(display_rows)} of {len(rows)} records.*"
+            )
         return "I encountered an error processing your request. Please try again."

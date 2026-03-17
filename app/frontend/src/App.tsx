@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import EmissionsOverview from "./components/EmissionsOverview";
 import MarketNotices from "./components/MarketNotices";
 import EnforcementTracker from "./components/EnforcementTracker";
@@ -7,6 +7,13 @@ import ComplianceGaps from "./components/ComplianceGaps";
 import ChatPanel from "./components/ChatPanel";
 
 type Tab = "emissions" | "notices" | "enforcement" | "obligations" | "gaps";
+
+interface Metadata {
+  emissions_count?: number;
+  notices_count?: number;
+  enforcement_count?: number;
+  obligations_count?: number;
+}
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "gaps", label: "Compliance Insights" },
@@ -28,6 +35,14 @@ function TabContent({ tab }: { tab: Tab }) {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("gaps");
+  const [metadata, setMetadata] = useState<Metadata | null>(null);
+
+  useEffect(() => {
+    fetch("/api/metadata")
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((d) => setMetadata(d))
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="app-container">
@@ -35,6 +50,17 @@ export default function App() {
         <div>
           <h1>Energy Compliance Intelligence Hub</h1>
           <div className="subtitle">Australian energy regulatory data — CER, AEMO, AER</div>
+          {metadata && (
+            <div className="data-source-banner">
+              <span>{metadata.emissions_count} emissions</span>
+              <span className="dot" />
+              <span>{metadata.notices_count} notices</span>
+              <span className="dot" />
+              <span>{metadata.enforcement_count} enforcement</span>
+              <span className="dot" />
+              <span>{metadata.obligations_count} obligations</span>
+            </div>
+          )}
         </div>
       </div>
 

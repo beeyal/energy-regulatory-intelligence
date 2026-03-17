@@ -9,6 +9,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { useApi } from "../hooks/useApi";
+import { LoadingPage } from "./LoadingSkeleton";
 
 interface EmissionsData {
   records: Record<string, string>[];
@@ -47,7 +48,7 @@ export default function EmissionsOverview() {
     }));
   }, [data]);
 
-  if (loading) return <div className="loading-spinner">Loading emissions data...</div>;
+  if (loading) return <LoadingPage />;
 
   const totalScope1 = data?.records?.reduce(
     (sum, r) => sum + parseFloat(r.scope1_emissions_tco2e || "0"), 0

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useApi } from "../hooks/useApi";
+import { LoadingPage } from "./LoadingSkeleton";
 
 interface ObligationsData {
   records: Record<string, string>[];
@@ -42,7 +43,7 @@ export default function ObligationRegister() {
 
   const { data, loading } = useApi<ObligationsData>("/api/obligations", params);
 
-  if (loading) return <div className="loading-spinner">Loading obligations...</div>;
+  if (loading) return <LoadingPage />;
 
   return (
     <div>

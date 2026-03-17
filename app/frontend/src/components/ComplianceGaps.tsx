@@ -1,4 +1,5 @@
 import { useApi } from "../hooks/useApi";
+import { LoadingPage } from "./LoadingSkeleton";
 
 interface InsightsData {
   insights: Record<string, string>[];
@@ -36,7 +37,7 @@ function insightLabel(type: string): string {
 export default function ComplianceGaps() {
   const { data, loading } = useApi<InsightsData>("/api/compliance-gaps");
 
-  if (loading) return <div className="loading-spinner">Analysing compliance gaps...</div>;
+  if (loading) return <LoadingPage />;
 
   const grouped = data?.grouped || {};
   const categories = ["repeat_offender", "high_emitter", "enforcement_trend", "notice_spike"];
