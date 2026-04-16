@@ -37,7 +37,7 @@
   --gradient-amber: linear-gradient(135deg, #fbbf24, #f59e0b);
   --gradient-red: linear-gradient(135deg, #f87171, #ef4444);
   --gradient-purple: linear-gradient(135deg, #a78bfa, #8b5cf6);
-  --gradient-header: linear-gradient(90deg, #4f8ff7 0%, #6366f1 40%, #a78bfa 70%, #06b6d4 100%);
+  --gradient-header: linear-gradient(90deg, #4f8ff7 0%, #6366f1 100%);
   --gradient-card-border: linear-gradient(135deg, rgba(79,143,247,0.2), rgba(99,102,241,0.05), rgba(167,139,250,0.1));
 
   /* Severity */
