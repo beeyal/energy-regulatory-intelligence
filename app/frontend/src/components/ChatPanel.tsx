@@ -4,10 +4,28 @@ import { useChatHistory, StoredMessage } from "../hooks/useChatHistory";
 import { useRole, ROLE_LABELS, UserRole } from "../hooks/useRole";
 import { useRegion } from "../context/RegionContext";
 
-const WELCOME: StoredMessage = {
+function buildWelcome(regionDetail: Record<string, any> | null, marketCode: string): string {
+  if (!regionDetail) {
+    return "Welcome to the Regulatory Intelligence Command Center.\n\nTry one of the prompts below or ask me anything about energy compliance.";
+  }
+  const { name, flag, market_name, data_available, regulators = [], carbon_scheme } = regionDetail;
+  const regList = regulators.slice(0, 4).map((r: any) => `**${r.code}** (${r.domain})`).join(", ");
+  const dataNote = data_available
+    ? `I have access to live ${name} compliance data.`
+    : `${name} data is coming soon — I'll answer from regulatory knowledge in the meantime.`;
+
+  return (
+    `${flag} Welcome to the **${name}** view of the Regulatory Intelligence Command Center.\n\n` +
+    `I can help you navigate the **${market_name}** — covering ${regList}.\n\n` +
+    (carbon_scheme?.name ? `Carbon scheme: **${carbon_scheme.name}** (${carbon_scheme.price} ${carbon_scheme.price_unit}).\n\n` : "") +
+    `${dataNote}\n\nTry one of the prompts below or ask me anything about ${name} energy compliance.`
+  );
+}
+
+const DEFAULT_WELCOME: StoredMessage = {
   id: "welcome",
   role: "assistant",
-  content: "Welcome to the Regulatory Intelligence Command Center. I can help you explore Australian energy regulatory data including CER emissions, AEMO market notices, AER enforcement actions, and regulatory obligations.\n\nTry one of the prompts below or ask me anything about energy compliance.",
+  content: buildWelcome(null, "AU"),
   timestamp: new Date().toISOString(),
 };
 
@@ -20,9 +38,17 @@ const ROLE_OPTIONS: { value: NonNullable<UserRole>; label: string; desc: string 
 ];
 
 export default function ChatPanel() {
-  const { messages, addMessage, updateLast, clearHistory } = useChatHistory(WELCOME);
+  const { messages, addMessage, updateLast, clearHistory, replaceWelcome } = useChatHistory(DEFAULT_WELCOME);
   const { role, setRole, chips } = useRole();
   const { market } = useRegion();
+
+  // Update the welcome message whenever the market changes
+  useEffect(() => {
+    fetch(`/api/regions/${market}`)
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((detail) => replaceWelcome(buildWelcome(detail, market)))
+      .catch(() => {});
+  }, [market]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [showRoleSelector, setShowRoleSelector] = useState(false);
