@@ -972,6 +972,29 @@ body {
 
 .heatmap-top-bar { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
 
+/* ── Dashboard charts row ────────────────────────────────────────── */
+.charts-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+.chart-card-header { margin-bottom: 12px; }
+.chart-card-header h3 { font-size: 13px; font-weight: 600; color: var(--text-primary); margin: 0 0 2px; }
+.chart-subtitle { font-size: 11px; color: var(--text-muted); }
+.chart-card-skeleton { animation: chart-pulse 1.5s ease-in-out infinite; }
+.skeleton-line { background: var(--border); border-radius: 4px; }
+.skeleton-block { background: var(--border); border-radius: 8px; }
+@keyframes chart-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+@media (max-width: 1100px) { .charts-row { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 700px)  { .charts-row { grid-template-columns: 1fr; } }
+
 .briefing-generate-btn {
   background: var(--gradient-blue);
   border: none;

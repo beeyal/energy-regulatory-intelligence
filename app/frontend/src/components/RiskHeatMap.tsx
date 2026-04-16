@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useApi } from "../hooks/useApi";
 import { LoadingCard, LoadingStats } from "./LoadingSkeleton";
 import BoardBriefing from "./BoardBriefing";
+import DashboardCharts from "./DashboardCharts";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -172,6 +173,9 @@ export default function RiskHeatMap() {
           Generate Board Briefing
         </button>
       </div>
+
+      {/* Dashboard charts — penalty trend, risk distribution, breach types */}
+      <DashboardCharts />
 
       {/* Heatmap card */}
       <div className="card">

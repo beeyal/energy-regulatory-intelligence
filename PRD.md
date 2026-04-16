@@ -523,6 +523,29 @@ targets:
 3. App auto-deploys with OAuth, SSO, and all environment variables configured
 4. Genie Space created via API post-deployment
 
+### 9.4 Known Issues
+
+#### KI-001: Setup Scripts Incompatible with Restricted Workspaces
+
+**Status:** Open  
+**Priority:** High  
+**Affects:** `scripts/setup_tables.py`, `scripts/setup_region_data.py`
+
+**Problem:** Both setup scripts use `DatabricksSession.builder.getOrCreate()` (Databricks Connect) and PySpark's `DataFrame.write` API. These require an all-purpose or jobs cluster, which is unavailable on many FE demo workspaces (no compute plane, or cluster creation blocked). Additionally, `CREATE CATALOG IF NOT EXISTS` fails on workspaces where the Unity Catalog metastore has no default managed storage root URL — a common configuration in shared/demo environments.
+
+Root causes:
+- Databricks Connect requires a running cluster; SQL warehouses are not supported
+- `CREATE CATALOG` without `MANAGED LOCATION` fails when metastore storage root is unset
+- Script assumes the user has `CREATE CATALOG` privilege, which is typically admin-only
+
+**Fix required:** Rewrite both scripts to use `databricks.sdk` `StatementExecutionAPI` (warehouse-based) instead of `DatabricksSession`:
+- Replace `spark.createDataFrame(...).write` with batched `INSERT INTO` statements via the SDK
+- Replace `spark.sql("CREATE CATALOG IF NOT EXISTS ...")` with a warehouse SQL call, with explicit error handling when the catalog must be pre-created by an admin
+- Add `--warehouse-id` CLI argument (auto-discover if not specified)
+- Document that the target catalog must be pre-created by a workspace admin with `MANAGED LOCATION` if the metastore has no default storage root
+
+**Workaround:** The app runs fully on in-memory data (loaded from bundled CSVs + synthetic generators at startup) and does not require Unity Catalog tables to function. The setup scripts are only needed if you want the data persisted as queryable Delta tables for Genie Spaces or external consumption.
+
 ### 9.3 Environments
 
 | Environment | Catalog | Warehouse | Use Case |

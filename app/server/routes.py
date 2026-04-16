@@ -478,6 +478,66 @@ def risk_heatmap(market: str = Query("AU")):
     }
 
 
+@router.get("/dashboard-charts")
+def dashboard_charts(market: str = Query("AU")):
+    """Aggregated chart data for the Risk Overview dashboard."""
+    s = store.get_store()
+    enf = s.get("enforcement_actions", pd.DataFrame())
+    obl = s.get("regulatory_obligations", pd.DataFrame())
+
+    if not enf.empty and "market" in enf.columns:
+        enf = enf[enf["market"] == market].copy()
+    if not obl.empty and "market" in obl.columns:
+        obl = obl[obl["market"] == market].copy()
+
+    # ── 1. Penalty trend by year ─────────────────────────────────────
+    penalty_trend = []
+    if not enf.empty and "action_date" in enf.columns and "penalty_aud" in enf.columns:
+        enf["_year"] = pd.to_datetime(enf["action_date"], errors="coerce").dt.year
+        by_year = (
+            enf.dropna(subset=["_year"])
+            .groupby("_year")["penalty_aud"]
+            .agg(total=("sum"), count=("count"))
+            .reset_index()
+            .sort_values("_year")
+        )
+        penalty_trend = [
+            {"year": str(int(r["_year"])), "total_penalty": round(r["total"], 0), "count": int(r["count"])}
+            for _, r in by_year.iterrows()
+        ]
+
+    # ── 2. Obligation risk distribution ─────────────────────────────
+    risk_dist = []
+    if not obl.empty and "risk_rating" in obl.columns:
+        order = ["Critical", "High", "Medium", "Low"]
+        counts = obl["risk_rating"].value_counts()
+        risk_dist = [
+            {"rating": r, "count": int(counts.get(r, 0))}
+            for r in order if counts.get(r, 0) > 0
+        ]
+
+    # ── 3. Top breach types by total penalty ────────────────────────
+    breach_types = []
+    if not enf.empty and "breach_type" in enf.columns and "penalty_aud" in enf.columns:
+        by_breach = (
+            enf.groupby("breach_type")["penalty_aud"]
+            .agg(total=("sum"), count=("count"))
+            .reset_index()
+            .sort_values("total", ascending=False)
+            .head(6)
+        )
+        breach_types = [
+            {"breach_type": r["breach_type"], "total_penalty": round(r["total"], 0), "count": int(r["count"])}
+            for _, r in by_breach.iterrows()
+        ]
+
+    return {
+        "penalty_trend": penalty_trend,
+        "risk_distribution": risk_dist,
+        "breach_types": breach_types,
+    }
+
+
 @router.get("/emissions-forecast")
 def emissions_forecast(market: str = Query("AU")):
     """Emissions trajectory forecast with baseline projections."""
