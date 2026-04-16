@@ -8,7 +8,17 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-import yaml
+try:
+    import yaml as _yaml
+    def _parse_yaml(text: str):
+        return _yaml.safe_load(text)
+except ImportError:
+    import json, re as _re
+    def _parse_yaml(text: str):  # type: ignore[misc]
+        raise RuntimeError(
+            "pyyaml is not installed. Add pyyaml>=6.0 to requirements.txt."
+        )
+
 from pydantic import BaseModel
 
 
@@ -57,7 +67,7 @@ class RegionConfig(BaseModel):
 def _load_yaml() -> dict[str, Any]:
     yaml_path = Path(__file__).parent.parent / "region.yaml"
     with open(yaml_path) as f:
-        return yaml.safe_load(f)
+        return _parse_yaml(f.read())
 
 
 @lru_cache(maxsize=32)

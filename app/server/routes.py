@@ -44,7 +44,12 @@ class ChatResponse(BaseModel):
 @router.get("/regions")
 def regions():
     """List all supported market regions."""
-    return {"markets": list_markets()}
+    try:
+        return {"markets": list_markets()}
+    except Exception as e:
+        logger.error(f"Failed to load regions: {e}")
+        return {"markets": [{"code": "AU", "name": "Australia", "flag": "🇦🇺",
+                              "market_name": "NEM", "data_available": "true"}]}
 
 
 @router.get("/regions/{market_code}")

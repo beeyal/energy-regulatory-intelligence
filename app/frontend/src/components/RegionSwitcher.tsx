@@ -16,7 +16,9 @@ export default function RegionSwitcher() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  if (!markets.length) return null;
+  // Always render — show default AU flag while markets are loading
+  const displayFlag = activeMarket?.flag ?? "🇦🇺";
+  const displayCode = market ?? "AU";
 
   return (
     <div className="region-switcher" ref={ref}>
@@ -26,8 +28,8 @@ export default function RegionSwitcher() {
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span className="region-flag">{activeMarket?.flag ?? "🌏"}</span>
-        <span className="region-code">{market}</span>
+        <span className="region-flag">{displayFlag}</span>
+        <span className="region-code">{displayCode}</span>
         <span className="region-chevron">{open ? "▲" : "▼"}</span>
       </button>
 
