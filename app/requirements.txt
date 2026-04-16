@@ -4,3 +4,4 @@ databricks-sdk>=0.20.0
 openai>=1.10.0
 sse-starlette>=1.6.0
 mlflow>=2.15
+pyyaml>=6.0

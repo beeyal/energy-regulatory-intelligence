@@ -12,6 +12,7 @@ from openai import OpenAI
 
 from .config import get_fqn, get_model_endpoint, get_workspace_client
 from .db import execute_query
+from .region import RegionConfig, build_system_prompt, get_region
 
 logger = logging.getLogger(__name__)
 
@@ -38,71 +39,94 @@ def _sanitize(val: str) -> str:
 
 # ── Intent classification ────────────────────────────────────────────────────
 
-INTENT_PATTERNS = {
+BASE_INTENT_PATTERNS = {
     "emissions": [
         r"emission", r"emitter", r"co2", r"carbon", r"scope\s*[12]",
-        r"pollut", r"greenhouse", r"nger", r"cer\b",
+        r"pollut", r"greenhouse",
     ],
     "notices": [
-        r"notice", r"market\s*notice", r"dispatch", r"aemo",
+        r"notice", r"market\s*notice", r"dispatch",
         r"non.?conformance", r"reclassif", r"suspension",
-        r"nsw1?|vic1?|qld1?|sa1|tas1",
     ],
     "enforcement": [
         r"fine", r"penalty", r"penalt", r"enforce", r"breach",
-        r"aer\b", r"infringement", r"court", r"undertaking",
+        r"infringement", r"court", r"undertaking",
     ],
     "obligations": [
         r"obligat", r"requirement", r"what\s+do\s+i\s+need",
-        r"regulat.*(?:require|rule|standard)", r"ner\s+chapter",
-        r"nerl\b", r"nerr\b", r"legislation", r"compliance\s+require",
+        r"regulat.*(?:require|rule|standard)",
+        r"legislation", r"compliance\s+require",
     ],
     "company_profile": [
         r"who\s+is", r"tell\s+me\s+about", r"repeat\s+offender",
         r"company\s+profile", r"history\s+of",
     ],
     "safeguard_forecast": [
-        r"safeguard", r"baseline", r"breach", r"shortfall",
+        r"baseline", r"shortfall",
         r"what.*if.*reduc", r"what.*happen.*if", r"forecast.*emission",
-        r"accu", r"what.*exposure", r"trajectory",
+        r"what.*exposure", r"trajectory",
     ],
     "summary": [
         r"summary", r"report", r"status", r"overview", r"dashboard",
     ],
 }
 
-# Real company names to detect as entity lookups
-KNOWN_COMPANIES = [
-    "agl", "origin", "energyaustralia", "stanwell", "cs energy",
-    "alinta", "snowy hydro", "engie", "synergy", "ergon",
-    "red energy", "lumo", "simply energy", "powershop", "momentum",
-    "globird", "1st energy", "dodo", "sumo", "tango", "actewagl",
-]
+# AU-specific additions (merged in when market == AU)
+_AU_EXTRAS: dict[str, list[str]] = {
+    "emissions": [r"nger", r"cer\b"],
+    "notices": [r"aemo", r"nsw1?", r"vic1?", r"qld1?", r"sa1\b", r"tas1\b"],
+    "enforcement": [r"aer\b"],
+    "obligations": [r"ner\s+chapter", r"nerl\b", r"nerr\b"],
+    "safeguard_forecast": [r"safeguard", r"accu"],
+}
 
 
-def classify_intent(message: str) -> str:
-    """Classify user message into a query intent."""
+def _build_intent_patterns(region: RegionConfig) -> dict[str, list[str]]:
+    """Merge base patterns with region-specific extras."""
+    patterns = {k: list(v) for k, v in BASE_INTENT_PATTERNS.items()}
+    # AU built-in extras
+    if region.code == "AU":
+        for intent, extras in _AU_EXTRAS.items():
+            patterns.setdefault(intent, []).extend(extras)
+    # Region-defined extras from region.yaml
+    for intent, extras in region.intent_extras.items():
+        patterns.setdefault(intent, []).extend(extras)
+    # Inject regulator codes as intent signals
+    for reg in region.regulators:
+        code_lower = reg.code.lower()
+        if any(kw in reg.domain.lower() for kw in ("emission", "carbon")):
+            patterns["emissions"].append(rf"\b{code_lower}\b")
+        elif any(kw in reg.domain.lower() for kw in ("market", "dispatch", "operator")):
+            patterns["notices"].append(rf"\b{code_lower}\b")
+        elif any(kw in reg.domain.lower() for kw in ("enforce", "compliance")):
+            patterns["enforcement"].append(rf"\b{code_lower}\b")
+    return patterns
+
+
+def classify_intent(message: str, market: str = "AU") -> str:
+    """Classify user message into a query intent, region-aware."""
+    region = get_region(market)
+    patterns = _build_intent_patterns(region)
+    known_companies = [c.lower() for c in region.known_companies]
     msg_lower = message.lower()
 
-    # Check pattern matches first (safeguard_forecast etc. take priority over company names)
     scores = {}
-    for intent, patterns in INTENT_PATTERNS.items():
-        score = sum(1 for p in patterns if re.search(p, msg_lower))
+    for intent, pats in patterns.items():
+        score = sum(1 for p in pats if re.search(p, msg_lower))
         if score > 0:
             scores[intent] = score
 
-    # High-confidence pattern match wins over company name detection
+    # High-confidence pattern match wins
     if scores:
         best_intent = max(scores, key=scores.get)
         if scores[best_intent] >= 2 or best_intent == "safeguard_forecast":
             return best_intent
 
-    # Check for company name mentions — route to company_profile
-    for company in KNOWN_COMPANIES:
+    # Check for known company mentions
+    for company in known_companies:
         if company in msg_lower:
             return "company_profile"
 
-    # Fall back to best pattern match if any
     if scores:
         return max(scores, key=scores.get)
 
@@ -111,9 +135,11 @@ def classify_intent(message: str) -> str:
 
 # ── Query builders ───────────────────────────────────────────────────────────
 
-def _build_context_query(intent: str, message: str) -> str:
+def _build_context_query(intent: str, message: str, market: str = "AU") -> str:
     """Build SQL query based on classified intent."""
+    region = get_region(market)
     msg_lower = message.lower()
+    known_companies = [c.lower() for c in region.known_companies]
 
     if intent == "emissions":
         # Check if they want a specific state
@@ -196,11 +222,11 @@ def _build_context_query(intent: str, message: str) -> str:
     elif intent == "safeguard_forecast":
         # Use UC Function for Safeguard Mechanism forecasting
         company = None
-        for c in KNOWN_COMPANIES:
+        for c in known_companies:
             if c in msg_lower:
                 company = c
                 break
-        company = company or "AGL"
+        company = company or (region.known_companies[0] if region.known_companies else "AGL")
 
         # Parse reduction rate if mentioned
         reduction = 0.02
@@ -217,9 +243,8 @@ def _build_context_query(intent: str, message: str) -> str:
         """
 
     elif intent == "company_profile":
-        # Find mentioned company
         company = None
-        for c in KNOWN_COMPANIES:
+        for c in known_companies:
             if c in msg_lower:
                 company = c
                 break
@@ -250,40 +275,21 @@ def _build_context_query(intent: str, message: str) -> str:
 
 # ── Chat function ────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are an expert Australian energy compliance analyst.
-You help energy companies understand their regulatory obligations, emissions data,
-market notices, and enforcement risks.
-
-You have access to real data from:
-- CER (Clean Energy Regulator): Corporate emissions and facility data (NGER reporting)
-- AEMO (Australian Energy Market Operator): Market notices (non-conformance, reclassification, etc.)
-- AER (Australian Energy Regulator): Enforcement actions, fines, and penalties
-- Regulatory obligations register: 80 real obligations from NER, NERL, NERR, NGER Act, ESA
-
-When answering:
-- Reference specific data points (company names, figures, dates)
-- Cite regulatory references (e.g., "NERL Section 122", "NER Chapter 7")
-- Highlight compliance risks and patterns
-- Be concise but thorough
-
-DATA CONTEXT:
-{context}
-"""
-
-
-def _build_context(intent: str, message: str) -> tuple[str, list]:
+def _build_context(intent: str, message: str, market: str = "AU") -> tuple[str, list]:
     """Build context string from data query. Returns (context, rows)."""
-    sql = _build_context_query(intent, message)
+    region = get_region(market)
     rows = []
     try:
-        rows = execute_query(sql)
+        if region.data_available:
+            sql = _build_context_query(intent, message, market)
+            rows = execute_query(sql)
         if rows:
             context_lines = []
             for row in rows[:15]:
                 context_lines.append(" | ".join(f"{k}: {v}" for k, v in row.items() if v is not None))
             context = "\n".join(context_lines)
         else:
-            context = "No matching data found for this query."
+            context = f"No data loaded for {region.name} market. Answer from regulatory knowledge."
     except Exception as e:
         logger.error(f"Query failed: {e}")
         context = f"Data query encountered an error: {str(e)}"
@@ -315,21 +321,22 @@ def _fallback_response(intent: str, rows: list) -> str:
 
 
 @mlflow.trace(name="compliance_copilot")
-def chat(message: str) -> str:
+def chat(message: str, market: str = "AU") -> str:
     """Process a chat message: classify intent, query data, generate response."""
-    intent = classify_intent(message)
-    logger.info(f"Classified intent: {intent}")
-    mlflow.update_current_trace(tags={"intent": intent})
+    region = get_region(market)
+    intent = classify_intent(message, market)
+    logger.info(f"[{market}] Classified intent: {intent}")
+    mlflow.update_current_trace(tags={"intent": intent, "market": market})
 
-    context, rows = _build_context(intent, message)
+    context, rows = _build_context(intent, message, market)
+    system_prompt = build_system_prompt(region, context)
 
-    # Call LLM
     try:
         client = _get_openai_client()
         response = client.chat.completions.create(
             model=get_model_endpoint(),
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT.format(context=context)},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": message},
             ],
             max_tokens=1024,
@@ -343,20 +350,22 @@ def chat(message: str) -> str:
 
 
 @mlflow.trace(name="compliance_copilot_stream")
-def chat_stream(message: str) -> Generator[str, None, None]:
+def chat_stream(message: str, market: str = "AU") -> Generator[str, None, None]:
     """Stream a chat response token-by-token. Yields text chunks."""
-    intent = classify_intent(message)
-    logger.info(f"Classified intent (stream): {intent}")
-    mlflow.update_current_trace(tags={"intent": intent})
+    region = get_region(market)
+    intent = classify_intent(message, market)
+    logger.info(f"[{market}] Classified intent (stream): {intent}")
+    mlflow.update_current_trace(tags={"intent": intent, "market": market})
 
-    context, rows = _build_context(intent, message)
+    context, rows = _build_context(intent, message, market)
+    system_prompt = build_system_prompt(region, context)
 
     try:
         client = _get_openai_client()
         stream = client.chat.completions.create(
             model=get_model_endpoint(),
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT.format(context=context)},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": message},
             ],
             max_tokens=1024,

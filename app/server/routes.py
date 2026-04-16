@@ -14,6 +14,7 @@ from sse_starlette.sse import EventSourceResponse
 from .config import get_fqn
 from .db import execute_query
 from .llm import chat, chat_stream as llm_chat_stream, classify_intent
+from .region import get_region, list_markets
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
@@ -30,6 +31,7 @@ def _sanitize(val: str) -> str:
 
 class ChatRequest(BaseModel):
     message: str
+    market: str = "AU"
 
 
 class ChatResponse(BaseModel):
@@ -38,6 +40,31 @@ class ChatResponse(BaseModel):
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
+
+@router.get("/regions")
+def regions():
+    """List all supported market regions."""
+    return {"markets": list_markets()}
+
+
+@router.get("/regions/{market_code}")
+def region_detail(market_code: str):
+    """Get full config for a specific market."""
+    region = get_region(market_code)
+    return {
+        "code": region.code,
+        "name": region.name,
+        "flag": region.flag,
+        "currency": region.currency,
+        "market_name": region.market_name,
+        "data_available": region.data_available,
+        "regulators": [r.model_dump() for r in region.regulators],
+        "carbon_scheme": region.carbon_scheme.model_dump(),
+        "key_legislation": region.key_legislation,
+        "sub_regions": region.sub_regions,
+        "known_companies": region.known_companies,
+    }
+
 
 @router.get("/emissions-overview")
 def emissions_overview(
@@ -559,14 +586,12 @@ async def chat_stream_endpoint(req: ChatRequest):
 
     async def event_generator():
         try:
-            intent = classify_intent(req.message)
-            # Send intent as the first event so the frontend knows the classification
+            intent = classify_intent(req.message, req.market)
             yield {"event": "intent", "data": json.dumps({"intent": intent})}
 
-            for token in llm_chat_stream(req.message):
+            for token in llm_chat_stream(req.message, req.market):
                 yield {"data": json.dumps(token)}
 
-            # Signal completion
             yield {"event": "done", "data": ""}
         except Exception as e:
             logger.error(f"Stream error: {e}")
@@ -578,6 +603,6 @@ async def chat_stream_endpoint(req: ChatRequest):
 @router.post("/chat", response_model=ChatResponse)
 def chat_endpoint(req: ChatRequest):
     """AI compliance assistant."""
-    intent = classify_intent(req.message)
-    response = chat(req.message)
+    intent = classify_intent(req.message, req.market)
+    response = chat(req.message, req.market)
     return ChatResponse(response=response, intent=intent)

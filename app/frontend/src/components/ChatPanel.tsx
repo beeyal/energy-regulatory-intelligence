@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { useChatHistory, StoredMessage } from "../hooks/useChatHistory";
 import { useRole, ROLE_LABELS, UserRole } from "../hooks/useRole";
+import { useRegion } from "../context/RegionContext";
 
 const WELCOME: StoredMessage = {
   id: "welcome",
@@ -21,6 +22,7 @@ const ROLE_OPTIONS: { value: NonNullable<UserRole>; label: string; desc: string 
 export default function ChatPanel() {
   const { messages, addMessage, updateLast, clearHistory } = useChatHistory(WELCOME);
   const { role, setRole, chips } = useRole();
+  const { market } = useRegion();
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [showRoleSelector, setShowRoleSelector] = useState(false);
@@ -53,7 +55,7 @@ export default function ChatPanel() {
       const resp = await fetch("/api/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text.trim() }),
+        body: JSON.stringify({ message: text.trim(), market }),
       });
 
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
