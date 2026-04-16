@@ -302,15 +302,12 @@ body {
 .region-chevron { font-size: 8px; opacity: 0.6; }
 
 .region-dropdown {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
   background: var(--bg-card-solid);
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   min-width: 240px;
-  z-index: 100;
+  z-index: 9999;
   overflow: hidden;
   animation: fadeSlideDown 0.15s ease;
 }
