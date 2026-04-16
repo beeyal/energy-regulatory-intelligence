@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import MarkdownRenderer from "./MarkdownRenderer";
 
 interface Message {
@@ -24,12 +24,25 @@ export default function ChatPanel() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [streaming, setStreaming] = useState(false);
   const messagesEnd = useRef<HTMLDivElement>(null);
+  // Accumulated content ref — avoids per-token React state updates
+  const contentRef = useRef("");
+  const rafRef = useRef<number>(0);
 
   useEffect(() => {
     messagesEnd.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const updateStreamingMessage = useCallback((content: string, done: boolean) => {
+    setMessages((prev) => {
+      const updated = [...prev];
+      const last = updated[updated.length - 1];
+      if (last?.role === "assistant") {
+        updated[updated.length - 1] = { ...last, content, streaming: !done };
+      }
+      return updated;
+    });
+  }, []);
 
   const send = async (text: string) => {
     if (!text.trim() || loading) return;
@@ -42,7 +55,7 @@ export default function ChatPanel() {
     ]);
     setInput("");
     setLoading(true);
-    setStreaming(true);
+    contentRef.current = "";
 
     try {
       const resp = await fetch("/api/chat/stream", {
@@ -58,73 +71,64 @@ export default function ChatPanel() {
 
       const decoder = new TextDecoder();
       let buffer = "";
-      // Track the SSE event type so we can skip non-text data payloads
       let currentEventType = "message";
+      let pendingUpdate = false;
+
+      const scheduleUpdate = () => {
+        if (!pendingUpdate) {
+          pendingUpdate = true;
+          rafRef.current = requestAnimationFrame(() => {
+            updateStreamingMessage(contentRef.current, false);
+            pendingUpdate = false;
+          });
+        }
+      };
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
+
+        // Split on newlines, handling both \r\n and \n
+        const lines = buffer.replace(/\r\n/g, "\n").split("\n");
         buffer = lines.pop() || "";
 
         for (const line of lines) {
-          if (!line.trim()) {
-            // Empty line resets event type per SSE spec
+          const trimmed = line.trim();
+          if (!trimmed) {
+            // Empty line = end of SSE event, reset type
             currentEventType = "message";
             continue;
           }
 
-          if (line.startsWith("event:")) {
-            currentEventType = line.slice(6).trim();
-            if (currentEventType === "done") {
-              setMessages((prev) => {
-                const updated = [...prev];
-                const last = updated[updated.length - 1];
-                if (last?.role === "assistant") {
-                  updated[updated.length - 1] = { ...last, streaming: false };
-                }
-                return updated;
-              });
-            }
+          if (trimmed.startsWith("event:")) {
+            currentEventType = trimmed.slice(6).trim();
             continue;
           }
 
-          if (line.startsWith("data:")) {
-            // Skip data payloads for non-text events (intent, done, error)
-            if (currentEventType !== "message") {
-              continue;
+          if (trimmed.startsWith("data:")) {
+            // Skip non-text events (intent, done, error)
+            if (currentEventType !== "message") continue;
+
+            // Extract payload: strip "data:" and the optional single space per SSE spec
+            let payload = trimmed.slice(5);
+            if (payload.startsWith(" ")) payload = payload.slice(1);
+
+            if (payload) {
+              contentRef.current += payload;
+              scheduleUpdate();
             }
-
-            const payload = line.slice(5);
-            if (!payload && payload !== " ") continue;
-
-            setMessages((prev) => {
-              const updated = [...prev];
-              const last = updated[updated.length - 1];
-              if (last?.role === "assistant") {
-                updated[updated.length - 1] = {
-                  ...last,
-                  content: last.content + payload,
-                };
-              }
-              return updated;
-            });
           }
         }
       }
 
-      // Ensure streaming flag is cleared
-      setMessages((prev) => {
-        const updated = [...prev];
-        const last = updated[updated.length - 1];
-        if (last?.role === "assistant" && last.streaming) {
-          updated[updated.length - 1] = { ...last, streaming: false };
-        }
-        return updated;
-      });
+      // Cancel any pending RAF and do final update with markdown rendering
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      updateStreamingMessage(contentRef.current, true);
+
     } catch {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
       setMessages((prev) => {
         const updated = [...prev];
         const last = updated[updated.length - 1];
@@ -139,7 +143,6 @@ export default function ChatPanel() {
       });
     } finally {
       setLoading(false);
-      setStreaming(false);
     }
   };
 
@@ -152,13 +155,11 @@ export default function ChatPanel() {
           <div key={i} className={`chat-msg ${msg.role}`}>
             {msg.role === "assistant" ? (
               msg.streaming ? (
-                // While streaming: render as plain text to avoid broken partial markdown
                 <>
                   <span className="streaming-text">{msg.content}</span>
                   <span className="typing-indicator">&#9608;</span>
                 </>
               ) : (
-                // Stream complete: render with full markdown formatting
                 <MarkdownRenderer content={msg.content} />
               )
             ) : (
@@ -166,9 +167,6 @@ export default function ChatPanel() {
             )}
           </div>
         ))}
-        {loading && !streaming && (
-          <div className="chat-msg assistant loading">Analysing compliance data...</div>
-        )}
         <div ref={messagesEnd} />
       </div>
 
