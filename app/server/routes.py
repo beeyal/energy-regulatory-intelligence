@@ -553,7 +553,7 @@ async def chat_stream_endpoint(req: ChatRequest):
             yield {"event": "intent", "data": json.dumps({"intent": intent})}
 
             for token in llm_chat_stream(req.message):
-                yield {"data": token}
+                yield {"data": json.dumps(token)}
 
             # Signal completion
             yield {"event": "done", "data": ""}

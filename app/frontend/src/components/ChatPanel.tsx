@@ -112,11 +112,20 @@ export default function ChatPanel() {
             if (currentEventType !== "message") continue;
 
             // Extract payload: strip "data:" and the optional single space per SSE spec
-            let payload = trimmed.slice(5);
-            if (payload.startsWith(" ")) payload = payload.slice(1);
+            let raw = trimmed.slice(5);
+            if (raw.startsWith(" ")) raw = raw.slice(1);
+            if (!raw) continue;
 
-            if (payload) {
-              contentRef.current += payload;
+            // Server JSON-encodes tokens to preserve newlines in SSE transport
+            try {
+              const token = JSON.parse(raw);
+              if (token) {
+                contentRef.current += token;
+                scheduleUpdate();
+              }
+            } catch {
+              // If not valid JSON, use raw (fallback)
+              contentRef.current += raw;
               scheduleUpdate();
             }
           }
