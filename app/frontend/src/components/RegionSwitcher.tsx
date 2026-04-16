@@ -7,6 +7,7 @@ export default function RegionSwitcher() {
   const [open, setOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Position the portal dropdown below the trigger button
   useEffect(() => {
@@ -19,13 +20,14 @@ export default function RegionSwitcher() {
     });
   }, [open]);
 
-  // Close on outside click
+  // Close on outside click — must exclude both trigger AND portal dropdown
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      const inTrigger = triggerRef.current?.contains(target);
+      const inDropdown = dropdownRef.current?.contains(target);
+      if (!inTrigger && !inDropdown) setOpen(false);
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
@@ -49,7 +51,7 @@ export default function RegionSwitcher() {
       </button>
 
       {open && createPortal(
-        <div className="region-dropdown" role="listbox" style={dropdownStyle}>
+        <div className="region-dropdown" role="listbox" style={dropdownStyle} ref={dropdownRef}>
           {markets.map((m) => {
             const isActive = m.code === market;
             const hasData = m.data_available === "true";
