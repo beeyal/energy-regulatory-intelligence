@@ -80,30 +80,43 @@ export default function App() {
   return (
     <div className="app-container">
       <div className="app-header">
-        <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
-          {theme === "dark" ? "☀ Light" : "◑ Dark"}
-        </button>
-        <div>
-          <h1>Regulatory Intelligence Command Center</h1>
-          <div className="subtitle">AI-powered compliance monitoring — CER, AEMO, AER, AEMC</div>
-          {metadata?.tables && (
-            <div className="data-source-banner">
-              <span>{metadata.tables.emissions_data || 0} emissions</span>
-              <span className="dot" />
-              <span>{metadata.tables.market_notices || 0} notices</span>
-              <span className="dot" />
-              <span>{metadata.tables.enforcement_actions || 0} enforcement</span>
-              <span className="dot" />
-              <span>{metadata.tables.regulatory_obligations || 0} obligations</span>
-            </div>
-          )}
-          <button
-            onClick={resetTour}
-            style={{ fontSize: 11, color: "var(--text-muted)", background: "none", border: "1px solid var(--border)", borderRadius: 5, padding: "3px 10px", cursor: "pointer", marginTop: 6 }}
-          >
+        <div className="header-actions">
+          <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
+            {theme === "dark" ? "☀ Light" : "◑ Dark"}
+          </button>
+          <button className="help-btn" onClick={resetTour} aria-label="Open help tour">
             ? Help
           </button>
         </div>
+
+        <div className="header-logo-row">
+          <div className="header-icon" aria-hidden="true">⚡</div>
+          <div>
+            <h1>Regulatory Intelligence Command Center</h1>
+            <div className="subtitle">AI-powered compliance monitoring — CER, AEMO, AER, AEMC</div>
+          </div>
+        </div>
+
+        {metadata?.tables && (
+          <div className="data-source-banner">
+            <div className="stat-pill emissions">
+              <span className="pill-value">{metadata.tables.emissions_data || 0}</span>
+              <span className="pill-label">emissions</span>
+            </div>
+            <div className="stat-pill notices">
+              <span className="pill-value">{metadata.tables.market_notices || 0}</span>
+              <span className="pill-label">notices</span>
+            </div>
+            <div className="stat-pill enforcement">
+              <span className="pill-value">{metadata.tables.enforcement_actions || 0}</span>
+              <span className="pill-label">enforcement</span>
+            </div>
+            <div className="stat-pill obligations">
+              <span className="pill-value">{metadata.tables.regulatory_obligations || 0}</span>
+              <span className="pill-label">obligations</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <nav className="tab-nav">
