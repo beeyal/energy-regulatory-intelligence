@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useApi } from "../hooks/useApi";
 import { LoadingPage } from "./LoadingSkeleton";
+import EmptyState from "./EmptyState";
+import ErrorState from "./ErrorState";
+import { downloadCsv } from "../utils/csv";
 
 interface ObligationsData {
   records: Record<string, string>[];
@@ -41,9 +44,10 @@ export default function ObligationRegister() {
   if (risk) params.risk_rating = risk;
   if (search) params.search = search;
 
-  const { data, loading } = useApi<ObligationsData>("/api/obligations", params);
+  const { data, loading, error, refetch } = useApi<ObligationsData>("/api/obligations", params);
 
   if (loading) return <LoadingPage />;
+  if (error) return <div className="card"><ErrorState message={`Failed to load obligations: ${error}`} onRetry={refetch} /></div>;
 
   return (
     <div>
@@ -98,9 +102,18 @@ export default function ObligationRegister() {
       <div className="card">
         <div className="card-header">
           <h2>Regulatory Obligation Register</h2>
-          <span className="badge" style={{ background: "rgba(52,211,153,0.15)", color: "var(--accent-green)" }}>
-            {data?.records?.length || 0} Obligations
-          </span>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span className="badge" style={{ background: "rgba(52,211,153,0.15)", color: "var(--accent-green)" }}>
+              {data?.records?.length || 0} Obligations
+            </span>
+            <button
+              onClick={() => downloadCsv(data?.records ?? [], `obligations-${new Date().toISOString().slice(0, 10)}.csv`)}
+              aria-label="Download obligations data as CSV"
+              style={{ fontSize: 11, padding: "3px 10px", background: "rgba(79,143,247,0.1)", color: "var(--accent-blue)", border: "1px solid rgba(79,143,247,0.2)", borderRadius: 5, cursor: "pointer" }}
+            >
+              ↓ CSV
+            </button>
+          </div>
         </div>
         <div style={{ overflowX: "auto" }}>
           <table className="data-table">
@@ -148,6 +161,15 @@ export default function ObligationRegister() {
             </tbody>
           </table>
         </div>
+        {(!data?.records || data.records.length === 0) && (
+          <EmptyState
+            icon="📋"
+            message="No obligations match your filters"
+            detail="Try adjusting the body, category, or risk level filters."
+            actionLabel="Clear filters"
+            onAction={() => setSearch("")}
+          />
+        )}
       </div>
     </div>
   );

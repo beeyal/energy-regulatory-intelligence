@@ -7,12 +7,15 @@ import EnforcementTracker from "./components/EnforcementTracker";
 import ObligationRegister from "./components/ObligationRegister";
 import ComplianceGaps from "./components/ComplianceGaps";
 import ChatPanel from "./components/ChatPanel";
+import OnboardingTour, { useOnboarding } from "./components/OnboardingTour";
+import FreshnessBadge from "./components/FreshnessBadge";
 
 type Tab = "risk" | "emissions" | "forecast" | "notices" | "enforcement" | "obligations" | "gaps";
 
 interface Metadata {
   tables?: Record<string, string | number>;
   catalog?: string;
+  last_ingested_at?: Record<string, string>;
 }
 
 const TABS: { id: Tab; label: string }[] = [
@@ -37,9 +40,33 @@ function TabContent({ tab }: { tab: Tab }) {
   }
 }
 
+function TabWrapper({ tab, metadata }: { tab: Tab; metadata: Metadata | null }) {
+  const tableMap: Partial<Record<Tab, string>> = {
+    enforcement: "enforcement_actions",
+    obligations: "regulatory_obligations",
+    emissions: "emissions_data",
+    notices: "market_notices",
+    gaps: "compliance_insights",
+  };
+  const tableKey = tableMap[tab];
+  const ts = tableKey ? metadata?.last_ingested_at?.[tableKey] : undefined;
+
+  return (
+    <div style={{ position: "relative" }}>
+      {ts && (
+        <div style={{ position: "absolute", top: 0, right: 0, zIndex: 10 }}>
+          <FreshnessBadge timestamp={ts} />
+        </div>
+      )}
+      <TabContent tab={tab} />
+    </div>
+  );
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("risk");
   const [metadata, setMetadata] = useState<Metadata | null>(null);
+  const { showTour, closeTour, resetTour } = useOnboarding();
 
   useEffect(() => {
     fetch("/api/metadata")
@@ -65,6 +92,12 @@ export default function App() {
               <span>{metadata.tables.regulatory_obligations || 0} obligations</span>
             </div>
           )}
+          <button
+            onClick={resetTour}
+            style={{ fontSize: 11, color: "var(--text-muted)", background: "none", border: "1px solid var(--border)", borderRadius: 5, padding: "3px 10px", cursor: "pointer", marginTop: 6 }}
+          >
+            ? Help
+          </button>
         </div>
       </div>
 
@@ -82,12 +115,14 @@ export default function App() {
 
       <div className="main-content">
         <div className="panel-area">
-          <TabContent tab={activeTab} />
+          <TabWrapper tab={activeTab} metadata={metadata} />
         </div>
         <div className="chat-area">
           <ChatPanel />
         </div>
       </div>
+
+      {showTour && <OnboardingTour onComplete={closeTour} />}
     </div>
   );
 }
