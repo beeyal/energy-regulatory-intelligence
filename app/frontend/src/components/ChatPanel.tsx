@@ -19,7 +19,7 @@ export default function ChatPanel() {
     {
       role: "assistant",
       content:
-        "Welcome to the Energy Compliance Intelligence Hub. I can help you explore Australian energy regulatory data including CER emissions, AEMO market notices, AER enforcement actions, and regulatory obligations.\n\nTry one of the prompts below or ask me anything about energy compliance.",
+        "Welcome to the Regulatory Intelligence Command Center. I can help you explore Australian energy regulatory data including CER emissions, AEMO market notices, AER enforcement actions, and regulatory obligations.\n\nTry one of the prompts below or ask me anything about energy compliance.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -35,7 +35,6 @@ export default function ChatPanel() {
     if (!text.trim() || loading) return;
 
     const userMsg: Message = { role: "user", content: text.trim() };
-    // Append user message and an empty assistant placeholder for streaming
     setMessages((prev) => [
       ...prev,
       userMsg,
@@ -59,6 +58,8 @@ export default function ChatPanel() {
 
       const decoder = new TextDecoder();
       let buffer = "";
+      // Track the SSE event type so we can skip non-text data payloads
+      let currentEventType = "message";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -66,17 +67,18 @@ export default function ChatPanel() {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
-        // Keep the last potentially incomplete line in the buffer
         buffer = lines.pop() || "";
 
         for (const line of lines) {
-          if (!line.trim()) continue;
+          if (!line.trim()) {
+            // Empty line resets event type per SSE spec
+            currentEventType = "message";
+            continue;
+          }
 
-          // SSE events: "event: <type>" or "data: <payload>"
           if (line.startsWith("event:")) {
-            const eventType = line.slice(6).trim();
-            if (eventType === "done") {
-              // Stream complete — mark message as no longer streaming
+            currentEventType = line.slice(6).trim();
+            if (currentEventType === "done") {
               setMessages((prev) => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1];
@@ -86,17 +88,18 @@ export default function ChatPanel() {
                 return updated;
               });
             }
-            // "intent" and "error" events are informational; we could use
-            // them later but for now we just let data flow through.
             continue;
           }
 
           if (line.startsWith("data:")) {
-            const payload = line.slice(5);
-            // Empty data payload (e.g. from "done" event) — skip
-            if (!payload) continue;
+            // Skip data payloads for non-text events (intent, done, error)
+            if (currentEventType !== "message") {
+              continue;
+            }
 
-            // Append token to the last assistant message
+            const payload = line.slice(5);
+            if (!payload && payload !== " ") continue;
+
             setMessages((prev) => {
               const updated = [...prev];
               const last = updated[updated.length - 1];
@@ -112,7 +115,7 @@ export default function ChatPanel() {
         }
       }
 
-      // Ensure streaming flag is cleared even if the "done" event was missed
+      // Ensure streaming flag is cleared
       setMessages((prev) => {
         const updated = [...prev];
         const last = updated[updated.length - 1];
@@ -121,8 +124,7 @@ export default function ChatPanel() {
         }
         return updated;
       });
-    } catch (e) {
-      // If streaming failed and the placeholder is still empty, replace it
+    } catch {
       setMessages((prev) => {
         const updated = [...prev];
         const last = updated[updated.length - 1];
@@ -149,10 +151,16 @@ export default function ChatPanel() {
         {messages.map((msg, i) => (
           <div key={i} className={`chat-msg ${msg.role}`}>
             {msg.role === "assistant" ? (
-              <>
+              msg.streaming ? (
+                // While streaming: render as plain text to avoid broken partial markdown
+                <>
+                  <span className="streaming-text">{msg.content}</span>
+                  <span className="typing-indicator">&#9608;</span>
+                </>
+              ) : (
+                // Stream complete: render with full markdown formatting
                 <MarkdownRenderer content={msg.content} />
-                {msg.streaming && <span className="typing-indicator">&#9608;</span>}
-              </>
+              )
             ) : (
               msg.content
             )}

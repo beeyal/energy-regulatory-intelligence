@@ -973,6 +973,14 @@ body {
 .md-table tr:last-child td { border-bottom: none; }
 .md-table tr:hover td { background: rgba(79, 143, 247, 0.04); }
 
+/* Streaming plain text (before markdown render) */
+.streaming-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
 /* Typing indicator */
 .typing-indicator {
   display: inline-block;
