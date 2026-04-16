@@ -1,12 +1,31 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { useChatHistory, StoredMessage } from "../hooks/useChatHistory";
-import { useRole, ROLE_LABELS, UserRole } from "../hooks/useRole";
+import { useRole, ROLE_LABELS, ROLE_CHIPS, UserRole } from "../hooks/useRole";
+import { useRegion } from "../context/RegionContext";
 
-const WELCOME: StoredMessage = {
+function buildWelcome(regionDetail: Record<string, any> | null, marketCode: string): string {
+  if (!regionDetail) {
+    return "Welcome to the Regulatory Intelligence Command Center.\n\nTry one of the prompts below or ask me anything about energy compliance.";
+  }
+  const { name, flag, market_name, data_available, regulators = [], carbon_scheme } = regionDetail;
+  const regList = regulators.slice(0, 4).map((r: any) => `**${r.code}** (${r.domain})`).join(", ");
+  const dataNote = data_available
+    ? `I have access to live ${name} compliance data.`
+    : `${name} data is coming soon — I'll answer from regulatory knowledge in the meantime.`;
+
+  return (
+    `${flag} Welcome to the **${name}** view of the Regulatory Intelligence Command Center.\n\n` +
+    `I can help you navigate the **${market_name}** — covering ${regList}.\n\n` +
+    (carbon_scheme?.name ? `Carbon scheme: **${carbon_scheme.name}** (${carbon_scheme.price} ${carbon_scheme.price_unit}).\n\n` : "") +
+    `${dataNote}\n\nTry one of the prompts below or ask me anything about ${name} energy compliance.`
+  );
+}
+
+const DEFAULT_WELCOME: StoredMessage = {
   id: "welcome",
   role: "assistant",
-  content: "Welcome to the Regulatory Intelligence Command Center. I can help you explore Australian energy regulatory data including CER emissions, AEMO market notices, AER enforcement actions, and regulatory obligations.\n\nTry one of the prompts below or ask me anything about energy compliance.",
+  content: buildWelcome(null, "AU"),
   timestamp: new Date().toISOString(),
 };
 
@@ -19,8 +38,53 @@ const ROLE_OPTIONS: { value: NonNullable<UserRole>; label: string; desc: string 
 ];
 
 export default function ChatPanel() {
-  const { messages, addMessage, updateLast, clearHistory } = useChatHistory(WELCOME);
-  const { role, setRole, chips } = useRole();
+  const { messages, addMessage, updateLast, clearHistory, replaceWelcome, resetToWelcome } = useChatHistory(DEFAULT_WELCOME);
+  const { role, setRole } = useRole();
+  const { market, activeMarket } = useRegion();
+
+  // Clear chat and update welcome whenever the market changes
+  useEffect(() => {
+    fetch(`/api/regions/${market}`)
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((detail) => resetToWelcome(buildWelcome(detail, market)))
+      .catch(() => {});
+  }, [market]);
+
+  // Build market-aware prompt chips
+  const chips = useMemo(() => {
+    const regs = (activeMarket as any)?.regulators?.map((r: any) => r.code) ?? [];
+    const companies: string[] = (activeMarket as any)?.known_companies ?? [];
+    const mktName = (activeMarket as any)?.name ?? market;
+    const schemeLabel = (activeMarket as any)?.carbon_scheme?.name ?? "carbon scheme";
+    const emissionsReg = regs.find((r: string) => ["CER","NEA","MoEFCC","MOE","NIER","ONEP","EMB"].includes(r)) ?? regs[0] ?? "regulator";
+    const marketOp = regs.find((r: string) => ["AEMO","EMA","EA","OCCTO","CERC","EGAT","NGCP"].includes(r)) ?? regs[1] ?? regs[0] ?? "market operator";
+    const enforcementReg = regs.find((r: string) => ["AER","EMA","Commerce Commission","METI","CERC"].includes(r)) ?? regs[0] ?? "regulator";
+    const company0 = companies[0] ?? "energy company";
+    const company1 = companies[1] ?? companies[0] ?? "energy company";
+
+    if (role) {
+      const base = ROLE_CHIPS[role];
+      return base.map((chip) =>
+        chip
+          .replace(/\bAGL\b/g, company0)
+          .replace(/\bAER\b/g, enforcementReg)
+          .replace(/\bAEMO\b/g, marketOp)
+          .replace(/\bCER\b/g, emissionsReg)
+          .replace(/\bSafeguard( Mechanism)?\b/g, schemeLabel)
+          .replace(/\bNER\s+Chapter\s+\d+\b/g, `${mktName} energy market rules`)
+          .replace(/\bNGER\b/g, `${emissionsReg} emissions reporting`)
+          .replace(/\bNERL\b|\bNERR\b/g, `${mktName} retail rules`)
+      );
+    }
+
+    // Default chips for this market
+    return [
+      `Who are the top 10 emitters in the ${mktName} electricity sector?`,
+      `Show recent ${marketOp} non-conformance notices`,
+      `Which companies have been fined the most by ${enforcementReg}?`,
+      `What are the key obligations under the ${schemeLabel}?`,
+    ];
+  }, [role, market, activeMarket]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [showRoleSelector, setShowRoleSelector] = useState(false);
@@ -53,7 +117,7 @@ export default function ChatPanel() {
       const resp = await fetch("/api/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text.trim() }),
+        body: JSON.stringify({ message: text.trim(), market }),
       });
 
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);

@@ -52,5 +52,31 @@ export function useChatHistory(initialMessage: StoredMessage) {
     setMessages([initialMessage]);
   };
 
-  return { messages, addMessage, updateLast, clearHistory };
+  const replaceWelcome = (content: string) => {
+    setMessages((prev) => {
+      const welcome: StoredMessage = {
+        id: "welcome",
+        role: "assistant",
+        content,
+        timestamp: new Date().toISOString(),
+      };
+      // Keep welcome as first message, preserve conversation that follows
+      if (prev.length <= 1) return [welcome];
+      return [welcome, ...prev.slice(1)];
+    });
+  };
+
+  /** Clear entire history and start fresh with a new welcome message. */
+  const resetToWelcome = (content: string) => {
+    const welcome: StoredMessage = {
+      id: "welcome",
+      role: "assistant",
+      content,
+      timestamp: new Date().toISOString(),
+    };
+    sessionStorage.removeItem(STORAGE_KEY);
+    setMessages([welcome]);
+  };
+
+  return { messages, addMessage, updateLast, clearHistory, replaceWelcome, resetToWelcome };
 }

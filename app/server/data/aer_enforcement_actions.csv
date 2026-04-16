@@ -1,0 +1,86 @@
+action_id,company_name,action_date,action_type,breach_type,breach_description,penalty_aud,outcome,regulatory_reference
+AER-2024-001,AGL Energy Limited,2024-06-15,Infringement Notice,NERL,Failure to comply with disconnection procedures for hardship customers,50000,Penalty paid,NERL Section 40
+AER-2024-002,Origin Energy Limited,2024-05-22,Compliance Audit,NERR,Inadequate customer hardship policy implementation,0,Audit completed - remediation required,NERR Rule 75
+AER-2024-003,EnergyAustralia Pty Ltd,2024-04-10,Infringement Notice,NERR,Failure to provide bill smoothing options as required,40000,Penalty paid,NERR Rule 32
+AER-2024-004,Alinta Energy Retail Sales Pty Ltd,2024-03-18,Court Proceedings,NERL,Wrongful disconnection of residential customers during extreme weather,250000,Court order - penalty imposed,NERL Section 40B
+AER-2024-005,Simply Energy,2024-02-28,Enforceable Undertaking,NERR,Failure to meet minimum requirements for market retail contracts,0,Undertaking accepted,NERR Rule 46
+AER-2024-006,Red Energy Pty Ltd,2024-01-15,Infringement Notice,NERR,Late payment fee applied incorrectly to concession customers,20000,Penalty paid,NERR Rule 73
+AER-2024-007,Lumo Energy Australia Pty Ltd,2024-01-08,Compliance Audit,NERL,Review of life support equipment registration processes,0,Audit completed - compliant,NERL Section 122
+AER-2023-008,AGL Energy Limited,2023-12-20,Infringement Notice,NERR,Failure to issue reminder notices within required timeframes,60000,Penalty paid,NERR Rule 110
+AER-2023-009,Origin Energy Limited,2023-11-14,Court Proceedings,NERL,Wrongful disconnection of life support customers,500000,Court order - penalty imposed,NERL Section 122
+AER-2023-010,EnergyAustralia Pty Ltd,2023-10-30,Enforceable Undertaking,NERR,Non-compliant explicit informed consent processes for market contracts,0,Undertaking accepted,NERR Rule 64
+AER-2023-011,Powershop Australia Pty Ltd,2023-10-15,Infringement Notice,NERR,Failure to provide access to historical billing data,20000,Penalty paid,NERR Rule 28
+AER-2023-012,1st Energy Pty Ltd,2023-09-22,Infringement Notice,NERL,Failure to comply with Retailer of Last Resort obligations,100000,Penalty paid,NERL Section 122
+AER-2023-013,Momentum Energy Pty Ltd,2023-09-05,Compliance Audit,NERR,Review of customer transfer processes and cooling-off periods,0,Audit completed - minor findings,NERR Rule 57
+AER-2023-014,ActewAGL Retail,2023-08-18,Infringement Notice,NERR,Incorrectly applying standing offer prices to market contract customers,35000,Penalty paid,NERR Rule 46
+AER-2023-015,Ergon Energy Queensland Pty Ltd,2023-07-30,Enforceable Undertaking,NERL,Systemic failures in customer complaint handling,0,Undertaking accepted,NERL Section 82
+AER-2023-016,AGL Energy Limited,2023-07-12,Court Proceedings,NERL,Misleading conduct in energy price advertising,800000,Court order - penalty imposed,NERL Section 221
+AER-2023-017,Origin Energy Limited,2023-06-25,Infringement Notice,NERR,Failure to provide minimum payment options on bills,30000,Penalty paid,NERR Rule 25
+AER-2023-018,EnergyAustralia Pty Ltd,2023-06-10,Infringement Notice,NERR,De-energisation without following required notice procedures,80000,Penalty paid,NERR Rule 111
+AER-2023-019,Sumo Power Pty Ltd,2023-05-28,Compliance Audit,NERR,Review of prepayment meter system compliance,0,Audit completed - remediation required,NERR Rule 130
+AER-2023-020,Globird Energy Pty Ltd,2023-05-15,Infringement Notice,NERL,Operating without adequate financial resources as required by licence,150000,Penalty paid,NERL Section 88
+AER-2023-021,Tango Energy Pty Ltd,2023-04-22,Infringement Notice,NERR,Failure to include required information on customer bills,25000,Penalty paid,NERR Rule 25
+AER-2023-022,Dodo Power & Gas Pty Ltd,2023-04-08,Enforceable Undertaking,NERR,Systemic billing errors affecting residential customers,0,Undertaking accepted,NERR Rule 20
+AER-2023-023,AGL Energy Limited,2023-03-15,Infringement Notice,NERR,Failure to obtain explicit informed consent for contract variations,45000,Penalty paid,NERR Rule 64
+AER-2023-024,Origin Energy Limited,2023-02-28,Court Proceedings,NERL,Unconscionable conduct in debt collection practices,350000,Court order - penalty imposed,NERL Section 221
+AER-2023-025,Simply Energy,2023-02-10,Infringement Notice,NERR,Incorrectly applying early termination fees,30000,Penalty paid,NERR Rule 50
+AER-2023-026,Alinta Energy Retail Sales Pty Ltd,2023-01-20,Compliance Audit,NERR,Review of smart meter data provision to customers,0,Audit completed - remediation required,NERR Rule 28A
+AER-2022-027,EnergyAustralia Pty Ltd,2022-12-15,Court Proceedings,NERL,Failure to comply with payment difficulty framework,600000,Court order - penalty imposed,NERL Section 50
+AER-2022-028,Red Energy Pty Ltd,2022-11-30,Infringement Notice,NERR,Late notification of price changes to customers,20000,Penalty paid,NERR Rule 46
+AER-2022-029,Lumo Energy Australia Pty Ltd,2022-11-10,Infringement Notice,NERR,Failure to comply with concession application requirements,15000,Penalty paid,NERR Rule 73
+AER-2022-030,AGL Energy Limited,2022-10-25,Enforceable Undertaking,NERL,Systemic issues with life support equipment customer management,0,Undertaking accepted,NERL Section 122
+AER-2022-031,Powershop Australia Pty Ltd,2022-10-05,Infringement Notice,NERR,Non-compliant cooling-off notice for online sign-ups,20000,Penalty paid,NERR Rule 47
+AER-2022-032,Origin Energy Limited,2022-09-18,Infringement Notice,NERR,Failure to process customer transfers within required timeframes,40000,Penalty paid,NERR Rule 57
+AER-2022-033,Momentum Energy Pty Ltd,2022-08-30,Infringement Notice,NERR,Failure to provide estimated bills when meter data unavailable,15000,Penalty paid,NERR Rule 21
+AER-2022-034,1st Energy Pty Ltd,2022-08-12,Court Proceedings,NERL,Misleading representations about Green Power content,200000,Court order - penalty imposed,NERL Section 221
+AER-2022-035,EnergyAustralia Pty Ltd,2022-07-25,Infringement Notice,NERR,Failure to offer payment plans before disconnection,55000,Penalty paid,NERR Rule 111
+AER-2022-036,AGL Energy Limited,2022-07-10,Infringement Notice,NER,Failure to comply with metering data provision requirements,70000,Penalty paid,NER Chapter 7
+AER-2022-037,Ergon Energy Queensland Pty Ltd,2022-06-22,Infringement Notice,NERL,Delayed connection of new residential premises,25000,Penalty paid,NERL Section 66
+AER-2022-038,ActewAGL Retail,2022-06-05,Compliance Audit,NERR,Review of customer switching processes,0,Audit completed - compliant,NERR Rule 57
+AER-2022-039,Alinta Energy Retail Sales Pty Ltd,2022-05-18,Infringement Notice,NERR,Failure to maintain customer hardship program records,35000,Penalty paid,NERR Rule 75
+AER-2022-040,Globird Energy Pty Ltd,2022-04-30,Court Proceedings,NERL,Failure to comply with Retailer of Last Resort customer transfer,300000,Court order - penalty imposed,NERL Section 132
+AER-2022-041,Simply Energy,2022-04-12,Infringement Notice,NERR,Incorrect application of solar feed-in tariff rates,20000,Penalty paid,NERR Rule 25
+AER-2022-042,Dodo Power & Gas Pty Ltd,2022-03-25,Infringement Notice,NERR,Failure to respond to customer complaints within required timeframes,15000,Penalty paid,NERR Rule 80
+AER-2022-043,Sumo Power Pty Ltd,2022-03-08,Enforceable Undertaking,NERR,Systemic failures in explicit informed consent processes,0,Undertaking accepted,NERR Rule 64
+AER-2022-044,Origin Energy Limited,2022-02-20,Infringement Notice,NERL,Failure to register life support equipment customers correctly,90000,Penalty paid,NERL Section 122
+AER-2022-045,AGL Energy Limited,2022-02-05,Compliance Audit,NERR,Comprehensive review of billing accuracy and dispute processes,0,Audit completed - minor findings,NERR Rule 20
+AER-2022-046,Red Energy Pty Ltd,2022-01-18,Infringement Notice,NERR,Failure to provide required information at point of sale,20000,Penalty paid,NERR Rule 64
+AER-2021-047,EnergyAustralia Pty Ltd,2021-12-10,Court Proceedings,NERL,Wrongful disconnection during COVID-19 moratorium period,1000000,Court order - penalty imposed,NERL Section 40
+AER-2021-048,AGL Energy Limited,2021-11-22,Infringement Notice,NERR,Failure to apply government energy rebates correctly,55000,Penalty paid,NERR Rule 73
+AER-2021-049,Origin Energy Limited,2021-11-05,Enforceable Undertaking,NERR,Systemic billing errors for solar customers,0,Undertaking accepted,NERR Rule 20
+AER-2021-050,Lumo Energy Australia Pty Ltd,2021-10-18,Infringement Notice,NERR,Non-compliant energy price fact sheets,20000,Penalty paid,NERR Rule 46
+AER-2021-051,Alinta Energy Retail Sales Pty Ltd,2021-09-30,Infringement Notice,NERL,Failure to comply with small customer connection timeframes,40000,Penalty paid,NERL Section 66
+AER-2021-052,Powershop Australia Pty Ltd,2021-09-12,Compliance Audit,NERR,Review of online sales channel compliance,0,Audit completed - remediation required,NERR Rule 64
+AER-2021-053,Tango Energy Pty Ltd,2021-08-25,Infringement Notice,NERR,Failure to include GST-inclusive pricing in marketing materials,15000,Penalty paid,NERR Rule 46
+AER-2021-054,AGL Energy Limited,2021-08-08,Court Proceedings,NERL,Systemic wrongful disconnection of customers in payment difficulty,750000,Court order - penalty imposed,NERL Section 40
+AER-2021-055,EnergyAustralia Pty Ltd,2021-07-20,Infringement Notice,NERR,Failure to provide quarterly bills as required,30000,Penalty paid,NERR Rule 24
+AER-2021-056,Simply Energy,2021-07-05,Infringement Notice,NERR,Incorrect calculation of solar feed-in credits,25000,Penalty paid,NERR Rule 25
+AER-2021-057,Ergon Energy Queensland Pty Ltd,2021-06-18,Enforceable Undertaking,NERL,Systemic delays in new connection provisioning,0,Undertaking accepted,NERL Section 66
+AER-2021-058,Origin Energy Limited,2021-06-02,Infringement Notice,NERR,Failure to comply with maximum disconnection timeframes,45000,Penalty paid,NERR Rule 111
+AER-2021-059,Momentum Energy Pty Ltd,2021-05-15,Infringement Notice,NERR,Non-compliant direct debit arrangements,20000,Penalty paid,NERR Rule 32
+AER-2021-060,Globird Energy Pty Ltd,2021-04-28,Infringement Notice,NERL,Failure to maintain adequate call centre response times,35000,Penalty paid,NERL Section 82
+AER-2021-061,AGL Energy Limited,2021-04-10,Infringement Notice,NERR,Failure to provide historical consumption data on request,20000,Penalty paid,NERR Rule 28
+AER-2021-062,1st Energy Pty Ltd,2021-03-22,Court Proceedings,NERL,Unauthorised doorstep sales practices,180000,Court order - penalty imposed,NERL Section 221
+AER-2021-063,Dodo Power & Gas Pty Ltd,2021-03-05,Infringement Notice,NERR,Failure to process concession card details correctly,15000,Penalty paid,NERR Rule 73
+AER-2021-064,EnergyAustralia Pty Ltd,2021-02-15,Enforceable Undertaking,NERR,Systemic issues with customer complaint escalation,0,Undertaking accepted,NERR Rule 80
+AER-2021-065,Red Energy Pty Ltd,2021-01-28,Infringement Notice,NERR,Failure to provide written confirmation of verbal agreements,15000,Penalty paid,NERR Rule 64
+AER-2020-066,AGL Energy Limited,2020-12-15,Court Proceedings,NERL,Large-scale billing errors affecting 60000+ customers,2000000,Court order - penalty imposed,NERL Section 221
+AER-2020-067,Origin Energy Limited,2020-11-20,Infringement Notice,NERR,Failure to comply with smart meter roll-out data requirements,50000,Penalty paid,NERR Rule 59A
+AER-2020-068,Alinta Energy Retail Sales Pty Ltd,2020-10-30,Infringement Notice,NERR,Failure to apply best offer message on bills,25000,Penalty paid,NERR Rule 46A
+AER-2020-069,EnergyAustralia Pty Ltd,2020-10-12,Infringement Notice,NER,Non-compliance with demand response mechanism requirements,60000,Penalty paid,NER Chapter 3
+AER-2020-070,Sumo Power Pty Ltd,2020-09-25,Infringement Notice,NERL,Failure to honour fixed-benefit period commitments,40000,Penalty paid,NERL Section 46
+AER-2020-071,Lumo Energy Australia Pty Ltd,2020-08-30,Compliance Audit,NERR,Review of COVID-19 customer support compliance,0,Audit completed - minor findings,NERR Rule 75
+AER-2020-072,AGL Energy Limited,2020-08-15,Infringement Notice,NERR,Failure to waive late payment fees during COVID-19,30000,Penalty paid,NERR Rule 73
+AER-2020-073,Origin Energy Limited,2020-07-22,Enforceable Undertaking,NERL,Systemic failures in customer complaints handling during COVID-19,0,Undertaking accepted,NERL Section 82
+AER-2020-074,Simply Energy,2020-07-05,Infringement Notice,NERR,Incorrectly charging early termination fees during cooling-off,20000,Penalty paid,NERR Rule 47
+AER-2020-075,Powershop Australia Pty Ltd,2020-06-18,Infringement Notice,NERR,Non-compliant marketing communications via SMS,15000,Penalty paid,NERR Rule 64
+AER-2020-076,Tango Energy Pty Ltd,2020-05-30,Court Proceedings,NERL,Systematic overcharging of residential customers,120000,Court order - penalty imposed,NERL Section 221
+AER-2020-077,EnergyAustralia Pty Ltd,2020-05-10,Infringement Notice,NERR,Failure to provide access to customer own data portal,25000,Penalty paid,NERR Rule 28
+AER-2020-078,Ergon Energy Queensland Pty Ltd,2020-04-22,Infringement Notice,NERL,Non-compliance with guaranteed service level payments,30000,Penalty paid,NERL Section 90
+AER-2020-079,ActewAGL Retail,2020-03-15,Compliance Audit,NERR,Review of tariff assignment practices,0,Audit completed - compliant,NERR Rule 46
+AER-2020-080,AGL Energy Limited,2020-03-01,Enforceable Undertaking,NERR,Systemic issues with wrongful disconnection prevention,0,Undertaking accepted,NERR Rule 111
+AER-2020-081,Globird Energy Pty Ltd,2020-02-12,Court Proceedings,NERL,Operating below minimum financial viability requirements,200000,Court order - penalty imposed,NERL Section 88
+AER-2020-082,Origin Energy Limited,2020-01-25,Infringement Notice,NERR,Failure to notify customers of tariff changes within required timeframes,35000,Penalty paid,NERR Rule 46
+AER-2019-083,AGL Energy Limited,2019-11-15,Court Proceedings,NERL,Wrongful disconnection of vulnerable customers,1500000,Court order - penalty imposed,NERL Section 40
+AER-2019-084,EnergyAustralia Pty Ltd,2019-10-28,Infringement Notice,NERR,Failure to provide minimum payment extension offers,35000,Penalty paid,NERR Rule 34
+AER-2019-085,Alinta Energy Retail Sales Pty Ltd,2019-09-12,Enforceable Undertaking,NERR,Customer transfer error affecting 5000 accounts,0,Undertaking accepted,NERR Rule 57

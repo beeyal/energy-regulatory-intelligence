@@ -1,0 +1,316 @@
+"""
+Static region configuration for all supported APJ markets.
+Kept as a plain Python dict to avoid any external YAML dependency.
+"""
+
+MARKETS: dict = {
+    "AU": {
+        "name": "Australia",
+        "flag": "🇦🇺",
+        "currency": "AUD",
+        "market_name": "NEM (National Electricity Market)",
+        "data_available": True,
+        "regulators": [
+            {"code": "CER",  "name": "Clean Energy Regulator",             "domain": "Emissions, NGER reporting, Safeguard Mechanism"},
+            {"code": "AEMO", "name": "Australian Energy Market Operator",   "domain": "Market operations, dispatch, market notices"},
+            {"code": "AER",  "name": "Australian Energy Regulator",         "domain": "Enforcement, compliance, network regulation"},
+            {"code": "AEMC", "name": "Australian Energy Market Commission", "domain": "Rule-making, market design"},
+            {"code": "ESV",  "name": "Energy Safe Victoria",                "domain": "Gas and electricity safety"},
+        ],
+        "carbon_scheme": {
+            "name": "Safeguard Mechanism", "operator": "CER",
+            "threshold_kt": 100, "price_unit": "AUD/tCO2-e", "price": 82.0,
+            "roadmap": "", "shortfall_multiplier": 2.75, "baseline_decline_pct": 4.9,
+        },
+        "key_legislation": [
+            "National Electricity Rules (NER)",
+            "National Energy Retail Law (NERL)",
+            "National Energy Retail Rules (NERR)",
+            "National Greenhouse and Energy Reporting Act 2007 (NGER Act)",
+            "Energy Safety Act (ESA)",
+            "Climate Change Act 2022",
+        ],
+        "sub_regions": ["NSW1", "VIC1", "QLD1", "SA1", "TAS1"],
+        "known_companies": [
+            "AGL Energy", "Origin Energy", "EnergyAustralia", "Stanwell Corporation",
+            "CS Energy", "Alinta Energy", "Snowy Hydro", "ENGIE Australia",
+            "Synergy", "Ergon Energy",
+        ],
+        "intent_extras": {
+            "emissions": [r"nger", r"cer\b"],
+            "notices": [r"aemo", r"nsw1?", r"vic1?", r"qld1?", r"sa1\b", r"tas1\b"],
+            "enforcement": [r"aer\b"],
+            "obligations": [r"ner\s+chapter", r"nerl\b", r"nerr\b"],
+            "safeguard_forecast": [r"safeguard", r"accu"],
+        },
+        "system_prompt_context": (
+            "You are an expert Australian energy compliance analyst covering the National Electricity Market (NEM). "
+            "Key regulators: CER (emissions/Safeguard), AEMO (market operations), AER (enforcement), AEMC (rules), ESV (safety). "
+            "Carbon scheme: Safeguard Mechanism — facilities >100kt CO2-e must stay within declining baselines (4.9%/year). "
+            "Shortfall charge: 275% of prevailing ACCU price (~AUD 82/t). Cite NER chapters, NERL sections, NGER Act provisions."
+        ),
+    },
+    "SG": {
+        "name": "Singapore",
+        "flag": "🇸🇬",
+        "currency": "SGD",
+        "market_name": "NEMS (National Electricity Market of Singapore)",
+        "data_available": True,
+        "regulators": [
+            {"code": "EMA",      "name": "Energy Market Authority",    "domain": "Market regulation, licensing, grid operations"},
+            {"code": "NEA",      "name": "National Environment Agency","domain": "Carbon pricing, industrial emissions"},
+            {"code": "MAS",      "name": "Monetary Authority of Singapore", "domain": "Climate-related financial disclosures"},
+            {"code": "SP Group", "name": "SP Group",                   "domain": "Transmission and distribution"},
+        ],
+        "carbon_scheme": {
+            "name": "Carbon Tax (Carbon Pricing Act)", "operator": "NEA",
+            "threshold_kt": 25, "price_unit": "SGD/tCO2-e", "price": 25.0,
+            "roadmap": "SGD 45 by 2026, SGD 50-80 by 2030",
+            "shortfall_multiplier": 1.0, "baseline_decline_pct": 0.0,
+        },
+        "key_legislation": [
+            "Electricity Act (Cap. 89A)",
+            "Energy Market Authority Act",
+            "Carbon Pricing Act 2018",
+            "Energy Conservation Act",
+            "Environmental Protection and Management Act",
+        ],
+        "sub_regions": ["Central", "East", "West", "North"],
+        "known_companies": [
+            "Sembcorp Industries", "Keppel Infrastructure", "Senoko Energy",
+            "YTL PowerSeraya", "Tuas Power", "Pacific Light Power",
+            "Sunseap Group", "City Energy",
+        ],
+        "intent_extras": {
+            "emissions": [r"carbon\s*tax", r"cpa\b", r"nea\b"],
+            "notices": [r"nems\b", r"ema\b"],
+        },
+        "system_prompt_context": (
+            "You are an expert Singapore energy compliance analyst covering the National Electricity Market of Singapore (NEMS). "
+            "Key regulators: EMA (market & licensing), NEA (carbon tax & industrial emissions), MAS (TCFD/climate finance). "
+            "Carbon scheme: Carbon Pricing Act — facilities emitting ≥25kt tCO2-e pay SGD 25/t, rising to SGD 45 by 2026 and SGD 50-80 by 2030. "
+            "Cite Electricity Act sections, EMA licence conditions, Carbon Pricing Act provisions."
+        ),
+    },
+    "NZ": {
+        "name": "New Zealand",
+        "flag": "🇳🇿",
+        "currency": "NZD",
+        "market_name": "NZEM (New Zealand Electricity Market)",
+        "data_available": True,
+        "regulators": [
+            {"code": "EA",                 "name": "Electricity Authority",       "domain": "Wholesale and retail market regulation"},
+            {"code": "Commerce Commission","name": "Commerce Commission",         "domain": "Network pricing, consumer protection"},
+            {"code": "MfE",                "name": "Ministry for the Environment","domain": "Climate change, ETS administration"},
+            {"code": "Transpower",         "name": "Transpower New Zealand",      "domain": "System operator, transmission"},
+        ],
+        "carbon_scheme": {
+            "name": "NZ ETS (Emissions Trading Scheme)", "operator": "MfE",
+            "threshold_kt": 0, "price_unit": "NZD/NZU", "price": 64.0,
+            "roadmap": "", "shortfall_multiplier": 1.0, "baseline_decline_pct": 0.0,
+        },
+        "key_legislation": [
+            "Electricity Industry Act 2010",
+            "Electricity Industry Participation Code 2010",
+            "Climate Change Response Act 2002",
+            "Energy Efficiency and Conservation Act 2000",
+        ],
+        "sub_regions": ["NI (North Island)", "SI (South Island)"],
+        "known_companies": [
+            "Genesis Energy", "Mercury Energy", "Meridian Energy", "Contact Energy",
+            "Todd Energy", "Nova Energy", "Trustpower", "Transpower",
+        ],
+        "intent_extras": {},
+        "system_prompt_context": (
+            "You are an expert New Zealand energy compliance analyst covering the New Zealand Electricity Market (NZEM). "
+            "Key regulators: Electricity Authority (market rules), Commerce Commission (network pricing), MfE (NZ ETS). "
+            "Carbon scheme: NZ ETS covers all stationary energy. NZU price ~NZD 64. "
+            "Cite Electricity Industry Act 2010 sections. Hydro dominates (~80% of generation)."
+        ),
+    },
+    "JP": {
+        "name": "Japan",
+        "flag": "🇯🇵",
+        "currency": "JPY",
+        "market_name": "JEPX (Japan Electric Power Exchange)",
+        "data_available": True,
+        "regulators": [
+            {"code": "METI",  "name": "Ministry of Economy, Trade and Industry",                          "domain": "Energy policy, licensing, emissions"},
+            {"code": "OCCTO", "name": "Organization for Cross-regional Coordination of Transmission Operators", "domain": "Grid balancing, supply-demand"},
+            {"code": "JEPX",  "name": "Japan Electric Power Exchange",                                    "domain": "Wholesale electricity trading"},
+            {"code": "MOE",   "name": "Ministry of the Environment",                                      "domain": "Carbon policy, GHG reporting"},
+        ],
+        "carbon_scheme": {
+            "name": "GX League / J-Credit", "operator": "METI",
+            "threshold_kt": 0, "price_unit": "JPY/tCO2", "price": 3000.0,
+            "roadmap": "GX-ETS piloting 2023-2025, full launch 2026",
+            "shortfall_multiplier": 1.0, "baseline_decline_pct": 0.0,
+        },
+        "key_legislation": [
+            "Electricity Business Act (電気事業法)",
+            "Act on Rational Use of Energy (省エネ法)",
+            "Act on Promotion of Global Warming Countermeasures",
+            "GX Promotion Act 2023",
+        ],
+        "sub_regions": ["Hokkaido", "Tohoku", "Tokyo", "Chubu", "Hokuriku", "Kansai", "Chugoku", "Shikoku", "Kyushu"],
+        "known_companies": [
+            "TEPCO (Tokyo Electric Power)", "Kansai Electric Power (KEPCO)", "Chubu Electric Power",
+            "Kyushu Electric Power", "Tohoku Electric Power", "JERA", "Eneos", "Osaka Gas",
+        ],
+        "intent_extras": {},
+        "system_prompt_context": (
+            "You are an expert Japanese energy compliance analyst covering the JEPX wholesale market. "
+            "Key regulators: METI (policy & licensing), OCCTO (grid coordination), MOE (GHG reporting). "
+            "Carbon scheme: GX League voluntary ETS piloting until 2026; J-Credit for verified reductions. JPY ~3,000/tCO2 spot. "
+            "Cite the Electricity Business Act (電気事業法), Act on Rational Use of Energy (省エネ法), and GX Promotion Act 2023."
+        ),
+    },
+    "IN": {
+        "name": "India",
+        "flag": "🇮🇳",
+        "currency": "INR",
+        "market_name": "IEX (Indian Energy Exchange)",
+        "data_available": True,
+        "regulators": [
+            {"code": "CERC", "name": "Central Electricity Regulatory Commission", "domain": "Wholesale tariffs, interstate transmission"},
+            {"code": "BEE",  "name": "Bureau of Energy Efficiency",               "domain": "PAT scheme, energy conservation"},
+            {"code": "MoPNG","name": "Ministry of Petroleum & Natural Gas",       "domain": "Upstream, downstream energy policy"},
+            {"code": "MNRE", "name": "Ministry of New and Renewable Energy",      "domain": "Renewable energy obligations, RPO"},
+        ],
+        "carbon_scheme": {
+            "name": "PAT (Perform Achieve Trade) + Carbon Credit Certificate", "operator": "BEE",
+            "threshold_kt": 0, "price_unit": "INR/CCC", "price": 1500.0,
+            "roadmap": "Carbon Credit Certificate market live 2024; CCTS framework under development",
+            "shortfall_multiplier": 1.0, "baseline_decline_pct": 0.0,
+        },
+        "key_legislation": [
+            "Electricity Act 2003",
+            "Energy Conservation Act 2001 (amended 2022)",
+            "Environment Protection Act 1986",
+            "National Action Plan on Climate Change",
+        ],
+        "sub_regions": ["Northern Region", "Western Region", "Southern Region", "Eastern Region", "Northeastern Region"],
+        "known_companies": [
+            "NTPC Limited", "Tata Power", "Adani Power", "JSW Energy",
+            "Torrent Power", "CESC", "Greenko Group", "ReNew Power",
+        ],
+        "intent_extras": {},
+        "system_prompt_context": (
+            "You are an expert Indian energy compliance analyst covering the IEX wholesale market and CERC regulation. "
+            "Key regulators: CERC (tariffs & interstate), BEE (PAT scheme/energy efficiency), MNRE (RPO obligations). "
+            "Carbon scheme: PAT scheme for large energy consumers; Carbon Credit Certificates (CCC) under 2022 EC Act amendments. "
+            "Cite the Electricity Act 2003, Energy Conservation (Amendment) Act 2022, and CERC regulations."
+        ),
+    },
+    "KR": {
+        "name": "South Korea",
+        "flag": "🇰🇷",
+        "currency": "KRW",
+        "market_name": "KPX (Korea Power Exchange)",
+        "data_available": True,
+        "regulators": [
+            {"code": "MOTIE", "name": "Ministry of Trade, Industry and Energy", "domain": "Energy policy, licensing"},
+            {"code": "KPX",   "name": "Korea Power Exchange",                   "domain": "Wholesale market operation"},
+            {"code": "KEPCO", "name": "Korea Electric Power Corporation",        "domain": "Transmission, distribution, retail"},
+            {"code": "KEA",   "name": "Korea Energy Agency",                    "domain": "Energy efficiency, KETS administration"},
+        ],
+        "carbon_scheme": {
+            "name": "K-ETS (Korean Emissions Trading Scheme)", "operator": "MOE (Ministry of Environment)",
+            "threshold_kt": 125, "price_unit": "KRW/tCO2", "price": 8500.0,
+            "roadmap": "", "shortfall_multiplier": 1.0, "baseline_decline_pct": 0.0,
+        },
+        "key_legislation": [
+            "Electric Utility Act (전기사업법)",
+            "Framework Act on Low Carbon Green Growth",
+            "Act on the Allocation and Trading of Greenhouse Gas Emission Permits",
+            "Energy Use Rationalization Act",
+        ],
+        "sub_regions": ["Seoul Metropolitan", "Gangwon", "Chungcheong", "Gyeonggi", "Jeolla", "Gyeongsang", "Jeju"],
+        "known_companies": [
+            "KEPCO (Korea Electric Power)", "Korea South-East Power (KOEN)", "Korea Midland Power (KOMIPO)",
+            "Korea Western Power (KOWEPO)", "Korea Southern Power (KOSPO)", "SK E&S", "GS Energy", "Hanwha Energy",
+        ],
+        "intent_extras": {},
+        "system_prompt_context": (
+            "You are an expert South Korean energy compliance analyst covering the KPX wholesale market. "
+            "Key regulators: MOTIE (policy), KPX (market operator), KEPCO (T&D), KEA (efficiency & K-ETS admin). "
+            "Carbon scheme: K-ETS — facilities ≥125kt tCO2 must surrender allowances. KAU spot ~KRW 8,500/t. "
+            "Cite the Electric Utility Act (전기사업법) and GHG Emissions Trading Act provisions."
+        ),
+    },
+    "TH": {
+        "name": "Thailand",
+        "flag": "🇹🇭",
+        "currency": "THB",
+        "market_name": "EGAT Regulated Market",
+        "data_available": True,
+        "regulators": [
+            {"code": "ERC",  "name": "Energy Regulatory Commission",          "domain": "Tariffs, licensing, market oversight"},
+            {"code": "EGAT", "name": "Electricity Generating Authority of Thailand", "domain": "Generation, transmission, system operator"},
+            {"code": "MEA",  "name": "Metropolitan Electricity Authority",    "domain": "Bangkok distribution"},
+            {"code": "PEA",  "name": "Provincial Electricity Authority",      "domain": "Provincial distribution"},
+        ],
+        "carbon_scheme": {
+            "name": "T-VER (Thailand Voluntary Emissions Reduction)", "operator": "TGO",
+            "threshold_kt": 0, "price_unit": "THB/tCO2", "price": 200.0,
+            "roadmap": "Mandatory ETS under development; Carbon Tax Bill pending",
+            "shortfall_multiplier": 1.0, "baseline_decline_pct": 0.0,
+        },
+        "key_legislation": [
+            "Energy Industry Act B.E. 2550 (2007)",
+            "Energy Conservation Promotion Act B.E. 2535 (1992)",
+            "Enhancement and Conservation of National Environmental Quality Act",
+            "Climate Change Act (draft)",
+        ],
+        "sub_regions": ["Central", "Northern", "Northeastern", "Eastern", "Southern"],
+        "known_companies": [
+            "EGAT", "GULF Energy Development", "B.Grimm Power", "Global Power Synergy (GPSC)",
+            "RATCH Group", "Banpu Power", "WHA Utilities and Power", "PTT Global Chemical",
+        ],
+        "intent_extras": {},
+        "system_prompt_context": (
+            "You are an expert Thai energy compliance analyst covering the EGAT-regulated electricity market. "
+            "Key regulators: ERC (licensing & tariffs), EGAT (generation & transmission), TGO (voluntary carbon). "
+            "Carbon scheme: T-VER voluntary market; mandatory carbon tax and ETS under legislative development. "
+            "Cite the Energy Industry Act B.E. 2550 and ERC regulations."
+        ),
+    },
+    "PH": {
+        "name": "Philippines",
+        "flag": "🇵🇭",
+        "currency": "PHP",
+        "market_name": "WESM (Wholesale Electricity Spot Market)",
+        "data_available": True,
+        "regulators": [
+            {"code": "DOE",   "name": "Department of Energy",                              "domain": "Energy policy, licensing, RE Act implementation"},
+            {"code": "ERC",   "name": "Energy Regulatory Commission",                      "domain": "Rate-setting, enforcement, consumer protection"},
+            {"code": "IEMOP", "name": "Independent Electricity Market Operator of the Philippines", "domain": "WESM operations"},
+            {"code": "TransCo","name": "National Transmission Corporation",                "domain": "Transmission grid"},
+        ],
+        "carbon_scheme": {
+            "name": "No formal ETS (NDC commitments only)", "operator": "DENR",
+            "threshold_kt": 0, "price_unit": "PHP/tCO2", "price": 0.0,
+            "roadmap": "Carbon market framework under study; RE Act provides green energy incentives",
+            "shortfall_multiplier": 1.0, "baseline_decline_pct": 0.0,
+        },
+        "key_legislation": [
+            "Electric Power Industry Reform Act (EPIRA) RA 9136",
+            "Renewable Energy Act 2008 (RA 9513)",
+            "Energy Efficiency and Conservation Act (RA 11285)",
+            "Philippine Clean Air Act",
+        ],
+        "sub_regions": ["Luzon", "Visayas", "Mindanao"],
+        "known_companies": [
+            "Meralco (Manila Electric Company)", "First Gen Corporation", "San Miguel Energy",
+            "Aboitiz Power", "SN Aboitiz Power", "Energy Development Corporation (EDC)",
+            "AboitizPower Thermal", "Global Business Power",
+        ],
+        "intent_extras": {},
+        "system_prompt_context": (
+            "You are an expert Philippine energy compliance analyst covering the WESM wholesale market. "
+            "Key regulators: DOE (policy & licensing), ERC (rates & enforcement), IEMOP (WESM operator). "
+            "Carbon: No mandatory ETS; Philippines has NDC commitments of 75% emissions reduction by 2030 (conditional). "
+            "Cite EPIRA (RA 9136) provisions, ERC resolutions, and RE Act (RA 9513) incentive mechanisms."
+        ),
+    },
+}

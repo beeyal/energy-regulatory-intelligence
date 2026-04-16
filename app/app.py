@@ -5,6 +5,8 @@ Serves the React frontend and API endpoints.
 
 import logging
 import os
+import threading
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -12,11 +14,27 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Pre-warm the in-memory data store in the background so first requests are fast
+    def _warm():
+        try:
+            from server.in_memory_data import _ensure_loaded
+            _ensure_loaded()
+        except Exception as e:
+            logger.warning(f"Data pre-warm failed: {e}")
+    threading.Thread(target=_warm, daemon=True).start()
+    yield
+
 
 app = FastAPI(
     title="Energy Compliance Intelligence Hub",
     description="Real-data compliance intelligence for Australian energy & utilities",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 from server.routes import router

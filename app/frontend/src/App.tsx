@@ -10,6 +10,8 @@ import ChatPanel from "./components/ChatPanel";
 import OnboardingTour, { useOnboarding } from "./components/OnboardingTour";
 import FreshnessBadge from "./components/FreshnessBadge";
 import { useTheme } from "./hooks/useTheme";
+import { RegionProvider, useRegion } from "./context/RegionContext";
+import RegionSwitcher from "./components/RegionSwitcher";
 
 type Tab = "risk" | "emissions" | "forecast" | "notices" | "enforcement" | "obligations" | "gaps";
 
@@ -65,22 +67,32 @@ function TabWrapper({ tab, metadata }: { tab: Tab; metadata: Metadata | null }) 
 }
 
 export default function App() {
+  return (
+    <RegionProvider>
+      <AppInner />
+    </RegionProvider>
+  );
+}
+
+function AppInner() {
   const [activeTab, setActiveTab] = useState<Tab>("risk");
   const [metadata, setMetadata] = useState<Metadata | null>(null);
   const { showTour, closeTour, resetTour } = useOnboarding();
   const { theme, toggleTheme } = useTheme();
+  const { market, activeMarket } = useRegion();
 
   useEffect(() => {
-    fetch("/api/metadata")
+    fetch(`/api/metadata?market=${market}`)
       .then((r) => r.ok ? r.json() : Promise.reject())
       .then((d) => setMetadata(d))
       .catch(() => {});
-  }, []);
+  }, [market]);
 
   return (
     <div className="app-container">
       <div className="app-header">
         <div className="header-actions">
+          <RegionSwitcher />
           <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
             {theme === "dark" ? "☀ Light" : "◑ Dark"}
           </button>
@@ -93,7 +105,11 @@ export default function App() {
           <div className="header-icon" aria-hidden="true">⚡</div>
           <div>
             <h1>Regulatory Intelligence Command Center</h1>
-            <div className="subtitle">AI-powered compliance monitoring — CER, AEMO, AER, AEMC</div>
+            <div className="subtitle">
+              {activeMarket
+                ? `${activeMarket.flag} ${activeMarket.name} — ${activeMarket.market_name}`
+                : "AI-powered compliance monitoring — CER, AEMO, AER, AEMC"}
+            </div>
           </div>
         </div>
 
@@ -118,6 +134,12 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {activeMarket && activeMarket.data_available === "false" && (
+        <div className="preview-banner">
+          <span>⚠ {activeMarket.name} data pipeline coming soon — the AI assistant is active and answers from regulatory knowledge</span>
+        </div>
+      )}
 
       <nav className="tab-nav">
         {TABS.map((tab) => (

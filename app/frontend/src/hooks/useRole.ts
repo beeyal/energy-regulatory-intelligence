@@ -12,7 +12,7 @@ export const ROLE_LABELS: Record<NonNullable<UserRole>, string> = {
   compliance_analyst: "Compliance Analyst",
 };
 
-export const ROLE_CHIPS: Record<NonNullable<UserRole>, string[]> = {
+export const ROLE_CHIPS: Record<NonNullable<UserRole>, string[]> = {  // exported for ChatPanel dynamic substitution
   cro: [
     "What are our top 3 regulatory risks this quarter?",
     "Which regulators have escalated enforcement recently?",
@@ -63,7 +63,5 @@ export function useRole() {
     setRoleState(r);
   };
 
-  const chips = role ? ROLE_CHIPS[role] : DEFAULT_CHIPS;
-
-  return { role, setRole, chips };
+  return { role, setRole };
 }

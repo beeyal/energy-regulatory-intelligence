@@ -29,7 +29,7 @@ function insightLabel(type: string): string {
     case "repeat_offender": return "Repeat Offender";
     case "high_emitter": return "High Emitter";
     case "enforcement_trend": return "Enforcement Trend";
-    case "notice_spike": return "Notice Spike";
+    case "notice_spike": return "Obligation Watch";
     default: return type;
   }
 }
