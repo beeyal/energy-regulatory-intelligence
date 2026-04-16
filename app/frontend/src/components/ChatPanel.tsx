@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import MarkdownRenderer from "./MarkdownRenderer";
 
 interface Message {
   role: "user" | "assistant";
@@ -147,8 +148,14 @@ export default function ChatPanel() {
       <div className="chat-messages">
         {messages.map((msg, i) => (
           <div key={i} className={`chat-msg ${msg.role}`}>
-            {msg.content}
-            {msg.streaming && <span className="typing-indicator">&#9608;</span>}
+            {msg.role === "assistant" ? (
+              <>
+                <MarkdownRenderer content={msg.content} />
+                {msg.streaming && <span className="typing-indicator">&#9608;</span>}
+              </>
+            ) : (
+              msg.content
+            )}
           </div>
         ))}
         {loading && !streaming && (
