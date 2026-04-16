@@ -9,6 +9,7 @@ import ComplianceGaps from "./components/ComplianceGaps";
 import ChatPanel from "./components/ChatPanel";
 import OnboardingTour, { useOnboarding } from "./components/OnboardingTour";
 import FreshnessBadge from "./components/FreshnessBadge";
+import { useTheme } from "./hooks/useTheme";
 
 type Tab = "risk" | "emissions" | "forecast" | "notices" | "enforcement" | "obligations" | "gaps";
 
@@ -67,6 +68,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("risk");
   const [metadata, setMetadata] = useState<Metadata | null>(null);
   const { showTour, closeTour, resetTour } = useOnboarding();
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     fetch("/api/metadata")
@@ -78,6 +80,9 @@ export default function App() {
   return (
     <div className="app-container">
       <div className="app-header">
+        <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
+          {theme === "dark" ? "☀ Light" : "◑ Dark"}
+        </button>
         <div>
           <h1>Regulatory Intelligence Command Center</h1>
           <div className="subtitle">AI-powered compliance monitoring — CER, AEMO, AER, AEMC</div>

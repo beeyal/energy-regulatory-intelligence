@@ -60,6 +60,81 @@
   --shadow-glow-amber: 0 0 20px rgba(251,191,36,0.15);
 }
 
+/* ================================================================== */
+/*  Light Theme Overrides                                              */
+/* ================================================================== */
+
+[data-theme="light"] {
+  --bg-primary: #f4f6fb;
+  --bg-secondary: #edf0f7;
+  --bg-card: rgba(255, 255, 255, 0.85);
+  --bg-card-solid: #ffffff;
+  --bg-card-hover: rgba(240, 244, 255, 0.9);
+  --bg-glass: rgba(255, 255, 255, 0.7);
+  --border: rgba(0, 0, 0, 0.08);
+  --border-accent: rgba(0, 0, 0, 0.12);
+  --border-glow: rgba(79, 143, 247, 0.25);
+
+  --text-primary: #0f1623;
+  --text-secondary: #4a5272;
+  --text-muted: #8892a8;
+
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.07);
+  --shadow-md: 0 4px 20px rgba(0,0,0,0.1);
+  --shadow-lg: 0 8px 40px rgba(0,0,0,0.14);
+  --shadow-glow-blue: 0 0 20px rgba(79,143,247,0.12);
+  --shadow-glow-red: 0 0 20px rgba(239,68,68,0.1);
+  --shadow-glow-green: 0 0 20px rgba(52,211,153,0.1);
+  --shadow-glow-amber: 0 0 20px rgba(245,158,11,0.1);
+}
+
+[data-theme="light"] body {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(79,143,247,0.05), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 60%, rgba(99,102,241,0.03), transparent);
+}
+
+[data-theme="light"] .app-header {
+  background: rgba(244, 246, 251, 0.92);
+}
+
+[data-theme="light"] .tab-nav {
+  background: rgba(237, 240, 247, 0.95);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.12);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.2);
+}
+
+/* Theme toggle button */
+.theme-toggle {
+  position: absolute;
+  top: 20px;
+  right: 28px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-accent);
+  border-radius: 20px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+}
+
+.theme-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-blue);
+}
+
 * {
   margin: 0;
   padding: 0;
