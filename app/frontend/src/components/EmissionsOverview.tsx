@@ -10,6 +10,9 @@ import {
 } from "recharts";
 import { useApi } from "../hooks/useApi";
 import { LoadingPage } from "./LoadingSkeleton";
+import EmptyState from "./EmptyState";
+import ErrorState from "./ErrorState";
+import { downloadCsv } from "../utils/csv";
 
 interface EmissionsData {
   records: Record<string, string>[];
@@ -36,7 +39,7 @@ export default function EmissionsOverview() {
   if (state) params.state = state;
   if (fuel) params.fuel_source = fuel;
 
-  const { data, loading } = useApi<EmissionsData>("/api/emissions-overview", params);
+  const { data, loading, error, refetch } = useApi<EmissionsData>("/api/emissions-overview", params);
 
   const chartData = useMemo(() => {
     if (!data?.records) return [];
@@ -49,6 +52,7 @@ export default function EmissionsOverview() {
   }, [data]);
 
   if (loading) return <LoadingPage />;
+  if (error) return <div className="card"><ErrorState message={`Failed to load emissions data: ${error}`} onRetry={refetch} /></div>;
 
   const totalScope1 = data?.records?.reduce(
     (sum, r) => sum + parseFloat(r.scope1_emissions_tco2e || "0"), 0
@@ -96,9 +100,18 @@ export default function EmissionsOverview() {
       <div className="card">
         <div className="card-header">
           <h2>Top Emitters — Scope 1 (t CO2-e)</h2>
-          <span className="badge" style={{ background: "rgba(79,143,247,0.15)", color: "var(--accent-blue)" }}>
-            CER NGER Data
-          </span>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span className="badge" style={{ background: "rgba(79,143,247,0.15)", color: "var(--accent-blue)" }}>
+              CER NGER Data
+            </span>
+            <button
+              onClick={() => downloadCsv(data?.records ?? [], `emissions-${new Date().toISOString().slice(0, 10)}.csv`)}
+              aria-label="Download emissions data as CSV"
+              style={{ fontSize: 11, padding: "3px 10px", background: "rgba(79,143,247,0.1)", color: "var(--accent-blue)", border: "1px solid rgba(79,143,247,0.2)", borderRadius: 5, cursor: "pointer" }}
+            >
+              ↓ CSV
+            </button>
+          </div>
         </div>
         <div className="chart-container">
           <ResponsiveContainer width="100%" height="100%">
@@ -146,6 +159,15 @@ export default function EmissionsOverview() {
             </tbody>
           </table>
         </div>
+        {(!data?.records || data.records.length === 0) && (
+          <EmptyState
+            icon="🏭"
+            message="No emissions records match your filters"
+            detail="Try selecting a different state or fuel source."
+            actionLabel="Reset filters"
+            onAction={() => { setState(""); setFuel(""); }}
+          />
+        )}
       </div>
     </div>
   );

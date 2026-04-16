@@ -7,12 +7,16 @@ import EnforcementTracker from "./components/EnforcementTracker";
 import ObligationRegister from "./components/ObligationRegister";
 import ComplianceGaps from "./components/ComplianceGaps";
 import ChatPanel from "./components/ChatPanel";
+import OnboardingTour, { useOnboarding } from "./components/OnboardingTour";
+import FreshnessBadge from "./components/FreshnessBadge";
+import { useTheme } from "./hooks/useTheme";
 
 type Tab = "risk" | "emissions" | "forecast" | "notices" | "enforcement" | "obligations" | "gaps";
 
 interface Metadata {
   tables?: Record<string, string | number>;
   catalog?: string;
+  last_ingested_at?: Record<string, string>;
 }
 
 const TABS: { id: Tab; label: string }[] = [
@@ -37,9 +41,34 @@ function TabContent({ tab }: { tab: Tab }) {
   }
 }
 
+function TabWrapper({ tab, metadata }: { tab: Tab; metadata: Metadata | null }) {
+  const tableMap: Partial<Record<Tab, string>> = {
+    enforcement: "enforcement_actions",
+    obligations: "regulatory_obligations",
+    emissions: "emissions_data",
+    notices: "market_notices",
+    gaps: "compliance_insights",
+  };
+  const tableKey = tableMap[tab];
+  const ts = tableKey ? metadata?.last_ingested_at?.[tableKey] : undefined;
+
+  return (
+    <div style={{ position: "relative" }}>
+      {ts && (
+        <div style={{ position: "absolute", top: 0, right: 0, zIndex: 10 }}>
+          <FreshnessBadge timestamp={ts} />
+        </div>
+      )}
+      <TabContent tab={tab} />
+    </div>
+  );
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>("risk");
   const [metadata, setMetadata] = useState<Metadata | null>(null);
+  const { showTour, closeTour, resetTour } = useOnboarding();
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     fetch("/api/metadata")
@@ -51,21 +80,43 @@ export default function App() {
   return (
     <div className="app-container">
       <div className="app-header">
-        <div>
-          <h1>Regulatory Intelligence Command Center</h1>
-          <div className="subtitle">AI-powered compliance monitoring — CER, AEMO, AER, AEMC</div>
-          {metadata?.tables && (
-            <div className="data-source-banner">
-              <span>{metadata.tables.emissions_data || 0} emissions</span>
-              <span className="dot" />
-              <span>{metadata.tables.market_notices || 0} notices</span>
-              <span className="dot" />
-              <span>{metadata.tables.enforcement_actions || 0} enforcement</span>
-              <span className="dot" />
-              <span>{metadata.tables.regulatory_obligations || 0} obligations</span>
-            </div>
-          )}
+        <div className="header-actions">
+          <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
+            {theme === "dark" ? "☀ Light" : "◑ Dark"}
+          </button>
+          <button className="help-btn" onClick={resetTour} aria-label="Open help tour">
+            ? Help
+          </button>
         </div>
+
+        <div className="header-logo-row">
+          <div className="header-icon" aria-hidden="true">⚡</div>
+          <div>
+            <h1>Regulatory Intelligence Command Center</h1>
+            <div className="subtitle">AI-powered compliance monitoring — CER, AEMO, AER, AEMC</div>
+          </div>
+        </div>
+
+        {metadata?.tables && (
+          <div className="data-source-banner">
+            <div className="stat-pill emissions">
+              <span className="pill-value">{metadata.tables.emissions_data || 0}</span>
+              <span className="pill-label">emissions</span>
+            </div>
+            <div className="stat-pill notices">
+              <span className="pill-value">{metadata.tables.market_notices || 0}</span>
+              <span className="pill-label">notices</span>
+            </div>
+            <div className="stat-pill enforcement">
+              <span className="pill-value">{metadata.tables.enforcement_actions || 0}</span>
+              <span className="pill-label">enforcement</span>
+            </div>
+            <div className="stat-pill obligations">
+              <span className="pill-value">{metadata.tables.regulatory_obligations || 0}</span>
+              <span className="pill-label">obligations</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <nav className="tab-nav">
@@ -82,12 +133,14 @@ export default function App() {
 
       <div className="main-content">
         <div className="panel-area">
-          <TabContent tab={activeTab} />
+          <TabWrapper tab={activeTab} metadata={metadata} />
         </div>
         <div className="chat-area">
           <ChatPanel />
         </div>
       </div>
+
+      {showTour && <OnboardingTour onComplete={closeTour} />}
     </div>
   );
 }

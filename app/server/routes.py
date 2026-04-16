@@ -244,8 +244,19 @@ def metadata():
     for t in tables:
         rows = execute_query(f"SELECT COUNT(*) as cnt FROM {get_fqn(t)}")
         counts[t] = rows[0]["cnt"] if rows else "0"
+
+    # Get last ingested timestamp per table from Delta metadata
+    ingested_at = {}
+    for t in tables:
+        try:
+            rows = execute_query(f"SELECT MAX(_metadata.file_modification_time) as ts FROM {get_fqn(t)}")
+            ingested_at[t] = str(rows[0]["ts"]) if rows and rows[0].get("ts") else None
+        except Exception:
+            ingested_at[t] = None
+
     return {
         "tables": counts,
+        "last_ingested_at": ingested_at,
         "catalog": get_fqn("").rsplit(".", 1)[0],
         "data_sources": {
             "emissions": {

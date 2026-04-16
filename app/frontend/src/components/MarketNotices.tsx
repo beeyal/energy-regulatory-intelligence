@@ -1,6 +1,9 @@
 import { useState, useMemo } from "react";
 import { useApi } from "../hooks/useApi";
 import { LoadingPage } from "./LoadingSkeleton";
+import EmptyState from "./EmptyState";
+import ErrorState from "./ErrorState";
+import { downloadCsv } from "../utils/csv";
 
 interface NoticesData {
   records: Record<string, string>[];
@@ -42,7 +45,7 @@ export default function MarketNotices() {
   if (noticeType) params.notice_type = noticeType;
   if (region) params.region = region;
 
-  const { data, loading } = useApi<NoticesData>("/api/market-notices", params);
+  const { data, loading, error, refetch } = useApi<NoticesData>("/api/market-notices", params);
 
   const paginatedRecords = useMemo(() => {
     if (!data?.records) return [];
@@ -53,6 +56,7 @@ export default function MarketNotices() {
   const totalPages = Math.ceil((data?.records?.length || 0) / PAGE_SIZE);
 
   if (loading) return <LoadingPage />;
+  if (error) return <div className="card"><ErrorState message={`Failed to load market notices: ${error}`} onRetry={refetch} /></div>;
 
   return (
     <div>
@@ -91,9 +95,18 @@ export default function MarketNotices() {
       <div className="card">
         <div className="card-header">
           <h2>AEMO Market Notices</h2>
-          <span className="badge" style={{ background: "rgba(79,143,247,0.15)", color: "var(--accent-blue)" }}>
-            NEMWeb Live Data
-          </span>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span className="badge" style={{ background: "rgba(79,143,247,0.15)", color: "var(--accent-blue)" }}>
+              NEMWeb Live Data
+            </span>
+            <button
+              onClick={() => downloadCsv(data?.records ?? [], `market-notices-${new Date().toISOString().slice(0, 10)}.csv`)}
+              aria-label="Download market notices as CSV"
+              style={{ fontSize: 11, padding: "3px 10px", background: "rgba(79,143,247,0.1)", color: "var(--accent-blue)", border: "1px solid rgba(79,143,247,0.2)", borderRadius: 5, cursor: "pointer" }}
+            >
+              ↓ CSV
+            </button>
+          </div>
         </div>
         <div style={{ overflowX: "auto" }}>
           <table className="data-table">
@@ -149,7 +162,13 @@ export default function MarketNotices() {
           </div>
         )}
         {(!data?.records || data.records.length === 0) && (
-          <div className="empty-state">No notices match the current filters.</div>
+          <EmptyState
+            icon="📡"
+            message="No notices match the current filters"
+            detail="Try selecting a different notice type or region."
+            actionLabel="Show all notices"
+            onAction={() => { setNoticeType(""); setRegion(""); }}
+          />
         )}
       </div>
     </div>
