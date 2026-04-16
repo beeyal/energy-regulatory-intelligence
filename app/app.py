@@ -17,36 +17,16 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(na
 logger = logging.getLogger(__name__)
 
 
-def _run_market_migration():
-    """
-    Ensure the market column exists in all data tables and backfill AU rows.
-    Runs in a background thread at startup so it doesn't block app boot.
-    """
-    try:
-        from server.db import execute_query
-        from server.config import get_fqn
-
-        tables = [
-            "emissions_data",
-            "market_notices",
-            "enforcement_actions",
-            "regulatory_obligations",
-        ]
-        for table in tables:
-            fqn = get_fqn(table)
-            # Add column if not already present
-            execute_query(f"ALTER TABLE {fqn} ADD COLUMN IF NOT EXISTS market STRING")
-            # Backfill existing AU rows that have no market tag
-            execute_query(f"UPDATE {fqn} SET market = 'AU' WHERE market IS NULL")
-            logger.info(f"Migration complete: {fqn} market column ready")
-    except Exception as e:
-        logger.warning(f"Market migration skipped (will retry on next start): {e}")
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Kick off migration in background — does not block startup
-    threading.Thread(target=_run_market_migration, daemon=True).start()
+    # Pre-warm the in-memory data store in the background so first requests are fast
+    def _warm():
+        try:
+            from server.in_memory_data import _ensure_loaded
+            _ensure_loaded()
+        except Exception as e:
+            logger.warning(f"Data pre-warm failed: {e}")
+    threading.Thread(target=_warm, daemon=True).start()
     yield
 
 
