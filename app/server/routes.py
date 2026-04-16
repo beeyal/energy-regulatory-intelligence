@@ -73,17 +73,18 @@ def region_detail(market_code: str):
 
 @router.get("/emissions-overview")
 def emissions_overview(
+    market: str = Query("AU"),
     state: Optional[str] = Query(None),
     fuel_source: Optional[str] = Query(None),
     limit: int = Query(20, le=100),
 ):
     """Top emitters with optional state/fuel filters."""
-    where_clauses = []
+    where_clauses = [f"market = '{_sanitize(market)}'"]
     if state:
         where_clauses.append(f"LOWER(state) = LOWER('{_sanitize(state)}')")
     if fuel_source:
         where_clauses.append(f"LOWER(primary_fuel_source) LIKE LOWER('%{_sanitize(fuel_source)}%')")
-    where = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    where = f"WHERE {' AND '.join(where_clauses)}"
 
     sql = f"""
         SELECT corporation_name, facility_name, state,
@@ -103,6 +104,7 @@ def emissions_overview(
                SUM(scope2_emissions_tco2e) as total_scope2,
                COUNT(*) as entity_count
         FROM {get_fqn('emissions_data')}
+        WHERE market = '{_sanitize(market)}'
         GROUP BY state
         ORDER BY total_scope1 DESC
     """
@@ -113,17 +115,18 @@ def emissions_overview(
 
 @router.get("/market-notices")
 def market_notices(
+    market: str = Query("AU"),
     notice_type: Optional[str] = Query(None),
     region: Optional[str] = Query(None),
     limit: int = Query(50, le=200),
 ):
-    """Recent AEMO market notices with filters."""
-    where_clauses = []
+    """Recent market notices with filters."""
+    where_clauses = [f"market = '{_sanitize(market)}'"]
     if notice_type:
         where_clauses.append(f"notice_type = '{_sanitize(notice_type)}'")
     if region:
         where_clauses.append(f"region = '{_sanitize(region)}'")
-    where = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    where = f"WHERE {' AND '.join(where_clauses)}"
 
     sql = f"""
         SELECT notice_id, notice_type, creation_date, region, reason, external_reference
@@ -134,10 +137,11 @@ def market_notices(
     """
     rows = execute_query(sql)
 
-    # Type distribution
+    # Type distribution for this market
     type_sql = f"""
         SELECT notice_type, COUNT(*) as count
         FROM {get_fqn('market_notices')}
+        WHERE market = '{_sanitize(market)}'
         GROUP BY notice_type
         ORDER BY count DESC
     """
@@ -148,21 +152,22 @@ def market_notices(
 
 @router.get("/enforcement")
 def enforcement(
+    market: str = Query("AU"),
     company: Optional[str] = Query(None),
     action_type: Optional[str] = Query(None),
     breach_type: Optional[str] = Query(None),
     sort_by: str = Query("penalty_aud"),
     limit: int = Query(50, le=200),
 ):
-    """AER enforcement actions with filters."""
-    where_clauses = []
+    """Enforcement actions with filters."""
+    where_clauses = [f"market = '{_sanitize(market)}'"]
     if company:
         where_clauses.append(f"LOWER(company_name) LIKE LOWER('%{_sanitize(company)}%')")
     if action_type:
         where_clauses.append(f"action_type = '{_sanitize(action_type)}'")
     if breach_type:
         where_clauses.append(f"breach_type = '{_sanitize(breach_type)}'")
-    where = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    where = f"WHERE {' AND '.join(where_clauses)}"
 
     allowed_sorts = ["penalty_aud", "action_date", "company_name"]
     sort_col = sort_by if sort_by in allowed_sorts else "penalty_aud"
@@ -179,7 +184,7 @@ def enforcement(
     """
     rows = execute_query(sql)
 
-    # Summary stats
+    # Summary stats for this market
     stats_sql = f"""
         SELECT
             COUNT(*) as total_actions,
@@ -187,6 +192,7 @@ def enforcement(
             COUNT(DISTINCT company_name) as companies_affected,
             MAX(penalty_aud) as max_penalty
         FROM {get_fqn('enforcement_actions')}
+        WHERE market = '{_sanitize(market)}'
     """
     stats = execute_query(stats_sql)
 
@@ -195,6 +201,7 @@ def enforcement(
 
 @router.get("/obligations")
 def obligations(
+    market: str = Query("AU"),
     regulatory_body: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
     risk_rating: Optional[str] = Query(None),
@@ -202,7 +209,7 @@ def obligations(
     limit: int = Query(80, le=200),
 ):
     """Regulatory obligations register with search."""
-    where_clauses = []
+    where_clauses = [f"market = '{_sanitize(market)}'"]
     if regulatory_body:
         where_clauses.append(f"regulatory_body = '{_sanitize(regulatory_body)}'")
     if category:
@@ -216,7 +223,7 @@ def obligations(
             f"OR LOWER(description) LIKE LOWER('%{safe_search}%') "
             f"OR LOWER(source_legislation) LIKE LOWER('%{safe_search}%'))"
         )
-    where = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    where = f"WHERE {' AND '.join(where_clauses)}"
 
     sql = f"""
         SELECT obligation_id, regulatory_body, obligation_name, category,
@@ -229,10 +236,11 @@ def obligations(
     """
     rows = execute_query(sql)
 
-    # Body distribution
+    # Body distribution for this market
     body_sql = f"""
         SELECT regulatory_body, COUNT(*) as count
         FROM {get_fqn('regulatory_obligations')}
+        WHERE market = '{_sanitize(market)}'
         GROUP BY regulatory_body
         ORDER BY count DESC
     """
@@ -242,7 +250,7 @@ def obligations(
 
 
 @router.get("/compliance-gaps")
-def compliance_gaps():
+def compliance_gaps(market: str = Query("AU")):
     """KEY INSIGHT: compliance gaps, repeat offenders, enforcement trends."""
     sql = f"""
         SELECT insight_type, entity_name, detail, metric_value, period, severity
@@ -263,67 +271,62 @@ def compliance_gaps():
 
 
 @router.get("/metadata")
-def metadata():
+def metadata(market: str = Query("AU")):
     """Data freshness and source metadata."""
-    tables = [
-        "emissions_data",
-        "market_notices",
-        "enforcement_actions",
-        "regulatory_obligations",
-        "compliance_insights",
-    ]
+    safe_market = _sanitize(market)
+    # Tables that are market-partitioned
+    market_tables = ["emissions_data", "market_notices", "enforcement_actions", "regulatory_obligations"]
+    # compliance_insights is AU-derived only, no market column
     counts = {}
-    for t in tables:
-        rows = execute_query(f"SELECT COUNT(*) as cnt FROM {get_fqn(t)}")
+    for t in market_tables:
+        rows = execute_query(f"SELECT COUNT(*) as cnt FROM {get_fqn(t)} WHERE market = '{safe_market}'")
         counts[t] = rows[0]["cnt"] if rows else "0"
+    rows = execute_query(f"SELECT COUNT(*) as cnt FROM {get_fqn('compliance_insights')}")
+    counts["compliance_insights"] = rows[0]["cnt"] if rows else "0"
 
     # Get last ingested timestamp per table from Delta metadata
+    all_tables = market_tables + ["compliance_insights"]
     ingested_at = {}
-    for t in tables:
+    for t in all_tables:
         try:
             rows = execute_query(f"SELECT MAX(_metadata.file_modification_time) as ts FROM {get_fqn(t)}")
             ingested_at[t] = str(rows[0]["ts"]) if rows and rows[0].get("ts") else None
         except Exception:
             ingested_at[t] = None
 
+    # Market-specific data source labels
+    try:
+        region_cfg = get_region(market)
+        reg_names = ", ".join(r.code for r in region_cfg.regulators[:3])
+        source_label = f"{region_cfg.name} regulatory data ({reg_names})"
+    except Exception:
+        source_label = "Regional regulatory data"
+
     return {
         "tables": counts,
         "last_ingested_at": ingested_at,
         "catalog": get_fqn("").rsplit(".", 1)[0],
         "data_sources": {
-            "emissions": {
-                "source": "CER NGER Reporting",
-                "period": "2023-24 / 2024-25",
-                "type": "Approximate (from published CER summaries)",
-            },
-            "market_notices": {
-                "source": "AEMO NEMWeb",
-                "period": "Jan 2024 – Mar 2025",
-                "type": "Generated from real notice patterns",
-            },
-            "enforcement": {
-                "source": "AER Compliance Reports",
-                "period": "2019 – 2024",
-                "type": "Curated from published enforcement data",
-            },
-            "obligations": {
-                "source": "NER, NERL, NERR, NGER Act, ESA",
-                "period": "Current",
-                "type": "Verified regulatory obligations",
-            },
+            "emissions": {"source": source_label, "period": "2023-24 / 2024-25", "type": "Synthetic from real patterns"},
+            "market_notices": {"source": source_label, "period": "Jan 2024 – Mar 2025", "type": "Synthetic from real notice types"},
+            "enforcement": {"source": source_label, "period": "2019 – 2024", "type": "Curated from published enforcement data"},
+            "obligations": {"source": source_label, "period": "Current", "type": "Curated regulatory obligations"},
         },
     }
 
 
 @router.get("/risk-heatmap")
-def risk_heatmap():
+def risk_heatmap(market: str = Query("AU")):
     """Compliance risk heat map: regulators × categories with risk scores."""
+    safe_market = _sanitize(market)
+
     # Get obligation counts and risk distribution
     obligations_sql = f"""
         SELECT regulatory_body, category, risk_rating,
                COUNT(*) as obligation_count,
                SUM(penalty_max_aud) as total_exposure
         FROM {get_fqn('regulatory_obligations')}
+        WHERE market = '{safe_market}'
         GROUP BY regulatory_body, category, risk_rating
     """
     obligations = execute_query(obligations_sql)
@@ -333,6 +336,7 @@ def risk_heatmap():
         SELECT breach_type, COUNT(*) as action_count,
                SUM(penalty_aud) as total_penalties
         FROM {get_fqn('enforcement_actions')}
+        WHERE market = '{safe_market}'
         GROUP BY breach_type
     """
     enforcement = execute_query(enforcement_sql)
@@ -341,12 +345,17 @@ def risk_heatmap():
     notices_sql = f"""
         SELECT notice_type, COUNT(*) as notice_count
         FROM {get_fqn('market_notices')}
+        WHERE market = '{safe_market}'
         GROUP BY notice_type
     """
     notices = execute_query(notices_sql)
 
-    # Build heatmap grid: regulator × category
-    regulators = ["CER", "AER", "AEMC", "AEMO", "ESV"]
+    # Build heatmap grid: regulator × category — use market-specific regulators
+    try:
+        region_cfg = get_region(market)
+        regulators = [r.code for r in region_cfg.regulators]
+    except Exception:
+        regulators = ["CER", "AER", "AEMC", "AEMO", "ESV"]
     categories = [
         "Market Operations", "Consumer Protection", "Safety & Technical",
         "Environmental & Emissions", "Financial & Reporting", "Network & Grid",
@@ -432,14 +441,15 @@ def risk_heatmap():
 
 
 @router.get("/emissions-forecast")
-def emissions_forecast():
-    """Emissions trajectory forecast with Safeguard Mechanism baselines."""
-    # Get current emissions by company
+def emissions_forecast(market: str = Query("AU")):
+    """Emissions trajectory forecast with baseline projections."""
+    # Get current emissions by company for this market
     sql = f"""
         SELECT corporation_name,
                SUM(scope1_emissions_tco2e) as total_scope1,
                SUM(scope2_emissions_tco2e) as total_scope2
         FROM {get_fqn('emissions_data')}
+        WHERE market = '{_sanitize(market)}'
         GROUP BY corporation_name
         ORDER BY total_scope1 DESC
         LIMIT 10
@@ -494,12 +504,15 @@ def emissions_forecast():
 
 
 @router.get("/board-briefing")
-def board_briefing():
+def board_briefing(market: str = Query("AU")):
     """Generate executive board briefing data pack."""
+    safe_market = _sanitize(market)
+
     # Overall compliance posture
     risk_sql = f"""
         SELECT risk_rating, COUNT(*) as count
         FROM {get_fqn('regulatory_obligations')}
+        WHERE market = '{safe_market}'
         GROUP BY risk_rating
     """
     risk_dist = execute_query(risk_sql)
@@ -508,6 +521,7 @@ def board_briefing():
     enforcement_sql = f"""
         SELECT company_name, action_type, penalty_aud, breach_description, action_date
         FROM {get_fqn('enforcement_actions')}
+        WHERE market = '{safe_market}'
         ORDER BY action_date DESC
         LIMIT 5
     """
@@ -518,6 +532,7 @@ def board_briefing():
         SELECT SUM(penalty_aud) as total, COUNT(*) as count,
                COUNT(DISTINCT company_name) as companies
         FROM {get_fqn('enforcement_actions')}
+        WHERE market = '{safe_market}'
     """
     penalty_stats = execute_query(penalty_sql)
 
@@ -525,7 +540,7 @@ def board_briefing():
     critical_sql = f"""
         SELECT obligation_name, regulatory_body, category, penalty_max_aud, frequency
         FROM {get_fqn('regulatory_obligations')}
-        WHERE risk_rating IN ('Critical', 'High')
+        WHERE market = '{safe_market}' AND risk_rating IN ('Critical', 'High')
         ORDER BY penalty_max_aud DESC
         LIMIT 10
     """
@@ -535,6 +550,7 @@ def board_briefing():
     emitter_sql = f"""
         SELECT corporation_name, SUM(scope1_emissions_tco2e) as scope1
         FROM {get_fqn('emissions_data')}
+        WHERE market = '{safe_market}'
         GROUP BY corporation_name
         ORDER BY scope1 DESC
         LIMIT 5

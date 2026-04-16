@@ -55,7 +55,7 @@ MARKETS: dict = {
         "flag": "🇸🇬",
         "currency": "SGD",
         "market_name": "NEMS (National Electricity Market of Singapore)",
-        "data_available": False,
+        "data_available": True,
         "regulators": [
             {"code": "EMA",      "name": "Energy Market Authority",    "domain": "Market regulation, licensing, grid operations"},
             {"code": "NEA",      "name": "National Environment Agency","domain": "Carbon pricing, industrial emissions"},
@@ -97,7 +97,7 @@ MARKETS: dict = {
         "flag": "🇳🇿",
         "currency": "NZD",
         "market_name": "NZEM (New Zealand Electricity Market)",
-        "data_available": False,
+        "data_available": True,
         "regulators": [
             {"code": "EA",                 "name": "Electricity Authority",       "domain": "Wholesale and retail market regulation"},
             {"code": "Commerce Commission","name": "Commerce Commission",         "domain": "Network pricing, consumer protection"},
@@ -133,7 +133,7 @@ MARKETS: dict = {
         "flag": "🇯🇵",
         "currency": "JPY",
         "market_name": "JEPX (Japan Electric Power Exchange)",
-        "data_available": False,
+        "data_available": True,
         "regulators": [
             {"code": "METI",  "name": "Ministry of Economy, Trade and Industry",                          "domain": "Energy policy, licensing, emissions"},
             {"code": "OCCTO", "name": "Organization for Cross-regional Coordination of Transmission Operators", "domain": "Grid balancing, supply-demand"},
@@ -170,7 +170,7 @@ MARKETS: dict = {
         "flag": "🇮🇳",
         "currency": "INR",
         "market_name": "IEX (Indian Energy Exchange)",
-        "data_available": False,
+        "data_available": True,
         "regulators": [
             {"code": "CERC", "name": "Central Electricity Regulatory Commission", "domain": "Wholesale tariffs, interstate transmission"},
             {"code": "BEE",  "name": "Bureau of Energy Efficiency",               "domain": "PAT scheme, energy conservation"},
@@ -207,7 +207,7 @@ MARKETS: dict = {
         "flag": "🇰🇷",
         "currency": "KRW",
         "market_name": "KPX (Korea Power Exchange)",
-        "data_available": False,
+        "data_available": True,
         "regulators": [
             {"code": "MOTIE", "name": "Ministry of Trade, Industry and Energy", "domain": "Energy policy, licensing"},
             {"code": "KPX",   "name": "Korea Power Exchange",                   "domain": "Wholesale market operation"},
@@ -243,7 +243,7 @@ MARKETS: dict = {
         "flag": "🇹🇭",
         "currency": "THB",
         "market_name": "EGAT Regulated Market",
-        "data_available": False,
+        "data_available": True,
         "regulators": [
             {"code": "ERC",  "name": "Energy Regulatory Commission",          "domain": "Tariffs, licensing, market oversight"},
             {"code": "EGAT", "name": "Electricity Generating Authority of Thailand", "domain": "Generation, transmission, system operator"},
@@ -280,7 +280,7 @@ MARKETS: dict = {
         "flag": "🇵🇭",
         "currency": "PHP",
         "market_name": "WESM (Wholesale Electricity Spot Market)",
-        "data_available": False,
+        "data_available": True,
         "regulators": [
             {"code": "DOE",   "name": "Department of Energy",                              "domain": "Energy policy, licensing, RE Act implementation"},
             {"code": "ERC",   "name": "Energy Regulatory Commission",                      "domain": "Rate-setting, enforcement, consumer protection"},

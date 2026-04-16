@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 # ── Schema definitions ──────────────────────────────────────────────────────
 
 EMISSIONS_SCHEMA = StructType([
+    StructField("market", StringType(), True),
     StructField("corporation_name", StringType(), False),
     StructField("facility_name", StringType(), True),
     StructField("state", StringType(), True),
@@ -53,6 +54,7 @@ EMISSIONS_SCHEMA = StructType([
 ])
 
 MARKET_NOTICES_SCHEMA = StructType([
+    StructField("market", StringType(), True),
     StructField("notice_id", StringType(), False),
     StructField("notice_type", StringType(), True),
     StructField("creation_date", TimestampType(), True),
@@ -63,6 +65,7 @@ MARKET_NOTICES_SCHEMA = StructType([
 ])
 
 ENFORCEMENT_SCHEMA = StructType([
+    StructField("market", StringType(), True),
     StructField("action_id", StringType(), False),
     StructField("company_name", StringType(), True),
     StructField("action_date", DateType(), True),
@@ -75,6 +78,7 @@ ENFORCEMENT_SCHEMA = StructType([
 ])
 
 OBLIGATIONS_SCHEMA = StructType([
+    StructField("market", StringType(), True),
     StructField("obligation_id", StringType(), False),
     StructField("regulatory_body", StringType(), True),
     StructField("obligation_name", StringType(), True),
@@ -128,24 +132,28 @@ def main():
     logger.info("=" * 60)
     logger.info("STEP 1: Ingesting CER emissions data")
     emissions_df = get_all_emissions()
+    emissions_df = emissions_df.assign(market="AU")
     write_delta_table(spark, emissions_df, EMISSIONS_SCHEMA, "emissions_data", args.catalog, args.schema)
 
     # ── 2. Market notices (AEMO) ──
     logger.info("=" * 60)
     logger.info("STEP 2: Ingesting AEMO market notices")
     notices_df = ingest_market_notices()
+    notices_df = notices_df.assign(market="AU")
     write_delta_table(spark, notices_df, MARKET_NOTICES_SCHEMA, "market_notices", args.catalog, args.schema)
 
     # ── 3. Enforcement actions (AER seed) ──
     logger.info("=" * 60)
     logger.info("STEP 3: Loading AER enforcement actions")
     enforcement_df = load_enforcement_actions()
+    enforcement_df = enforcement_df.assign(market="AU")
     write_delta_table(spark, enforcement_df, ENFORCEMENT_SCHEMA, "enforcement_actions", args.catalog, args.schema)
 
     # ── 4. Regulatory obligations (curated seed) ──
     logger.info("=" * 60)
     logger.info("STEP 4: Loading regulatory obligations")
     obligations_df = load_regulatory_obligations()
+    obligations_df = obligations_df.assign(market="AU")
     write_delta_table(spark, obligations_df, OBLIGATIONS_SCHEMA, "regulatory_obligations", args.catalog, args.schema)
 
     # ── 5. Compliance insights (derived) ──
