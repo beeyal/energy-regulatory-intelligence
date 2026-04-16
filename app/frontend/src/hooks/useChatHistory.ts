@@ -66,5 +66,17 @@ export function useChatHistory(initialMessage: StoredMessage) {
     });
   };
 
-  return { messages, addMessage, updateLast, clearHistory, replaceWelcome };
+  /** Clear entire history and start fresh with a new welcome message. */
+  const resetToWelcome = (content: string) => {
+    const welcome: StoredMessage = {
+      id: "welcome",
+      role: "assistant",
+      content,
+      timestamp: new Date().toISOString(),
+    };
+    sessionStorage.removeItem(STORAGE_KEY);
+    setMessages([welcome]);
+  };
+
+  return { messages, addMessage, updateLast, clearHistory, replaceWelcome, resetToWelcome };
 }

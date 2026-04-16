@@ -10,9 +10,9 @@ from typing import Generator
 import mlflow
 from openai import OpenAI
 
-from .config import get_fqn, get_model_endpoint, get_workspace_client
-from .db import execute_query
+from .config import get_model_endpoint, get_workspace_client
 from .region import RegionConfig, build_system_prompt, get_region
+from . import in_memory_data as mem
 
 logger = logging.getLogger(__name__)
 
@@ -133,166 +133,109 @@ def classify_intent(message: str, market: str = "AU") -> str:
     return "summary"
 
 
-# ── Query builders ───────────────────────────────────────────────────────────
+# ── Context builder (in-memory) ──────────────────────────────────────────────
 
-def _build_context_query(intent: str, message: str, market: str = "AU") -> str:
-    """Build SQL query based on classified intent."""
+def _build_context(intent: str, message: str, market: str = "AU") -> tuple[str, list]:
+    """Build context rows from the in-memory store, market-filtered."""
     region = get_region(market)
     msg_lower = message.lower()
     known_companies = [c.lower() for c in region.known_companies]
+    rows: list = []
 
-    if intent == "emissions":
-        # Check if they want a specific state
-        state_match = re.search(r"\b(nsw|vic|qld|sa|wa|tas|nt|act)\b", msg_lower)
-        state_filter = f"WHERE LOWER(state) = '{_sanitize(state_match.group(1))}'" if state_match else ""
-
-        fuel_match = re.search(r"\b(coal|gas|hydro|wind|solar)\b", msg_lower)
-        if fuel_match:
-            safe_fuel = _sanitize(fuel_match.group(1))
-            fuel_filter = f"{'WHERE' if not state_filter else 'AND'} LOWER(primary_fuel_source) LIKE '%{safe_fuel}%'"
-            state_filter += fuel_filter
-
-        return f"""
-            SELECT corporation_name, facility_name, state,
-                   scope1_emissions_tco2e, scope2_emissions_tco2e,
-                   electricity_production_mwh, primary_fuel_source, reporting_year
-            FROM {get_fqn('emissions_data')}
-            {state_filter}
-            ORDER BY scope1_emissions_tco2e DESC
-            LIMIT 20
-        """
-
-    elif intent == "notices":
-        type_filter = ""
-        if "non-conformance" in msg_lower or "non conformance" in msg_lower:
-            type_filter = "WHERE notice_type = 'NON-CONFORMANCE'"
-        elif "reclassif" in msg_lower:
-            type_filter = "WHERE notice_type = 'RECLASSIFY'"
-        elif "suspension" in msg_lower:
-            type_filter = "WHERE notice_type = 'MARKET SUSPENSION'"
-        elif "direction" in msg_lower:
-            type_filter = "WHERE notice_type = 'DIRECTION'"
-        elif "reserve" in msg_lower or "lor" in msg_lower:
-            type_filter = "WHERE notice_type = 'RESERVE NOTICE'"
-
-        region_match = re.search(r"\b(nsw1?|vic1?|qld1?|sa1|tas1)\b", msg_lower)
-        if region_match:
-            region = _sanitize(region_match.group(1).upper())
-            if not region.endswith("1") and region in ("NSW", "VIC", "QLD"):
-                region += "1"
-            region_clause = f"notice_type IS NOT NULL AND region = '{region}'"
-            type_filter = f"WHERE {region_clause}" if not type_filter else f"{type_filter} AND region = '{region}'"
-
-        return f"""
-            SELECT notice_id, notice_type, creation_date, region, reason
-            FROM {get_fqn('market_notices')}
-            {type_filter}
-            ORDER BY creation_date DESC
-            LIMIT 20
-        """
-
-    elif intent == "enforcement":
-        return f"""
-            SELECT company_name, action_date, action_type, breach_type,
-                   breach_description, penalty_aud, outcome, regulatory_reference
-            FROM {get_fqn('enforcement_actions')}
-            ORDER BY penalty_aud DESC NULLS LAST
-            LIMIT 20
-        """
-
-    elif intent == "obligations":
-        body_match = re.search(r"\b(aemo|aer|cer|esv)\b", msg_lower)
-        body_filter = f"WHERE LOWER(regulatory_body) = '{_sanitize(body_match.group(1))}'" if body_match else ""
-
-        cat_match = re.search(r"\b(market|safety|environment|technical|financial|consumer)\b", msg_lower)
-        if cat_match:
-            safe_cat = _sanitize(cat_match.group(1))
-            cat_clause = f"LOWER(category) = '{safe_cat}'"
-            body_filter = f"WHERE {cat_clause}" if not body_filter else f"{body_filter} AND {cat_clause}"
-
-        return f"""
-            SELECT obligation_name, regulatory_body, category, frequency,
-                   risk_rating, penalty_max_aud, source_legislation, description
-            FROM {get_fqn('regulatory_obligations')}
-            {body_filter}
-            ORDER BY penalty_max_aud DESC
-            LIMIT 20
-        """
-
-    elif intent == "safeguard_forecast":
-        # Use UC Function for Safeguard Mechanism forecasting
-        company = None
-        for c in known_companies:
-            if c in msg_lower:
-                company = c
-                break
-        company = company or (region.known_companies[0] if region.known_companies else "AGL")
-
-        # Parse reduction rate if mentioned
-        reduction = 0.02
-        rate_match = re.search(r"(\d+)\s*%", msg_lower)
-        if rate_match:
-            reduction = int(rate_match.group(1)) / 100
-
-        safe_company = _sanitize(company)
-        catalog = get_fqn("").rsplit(".", 2)[0]
-        return f"""
-            SELECT * FROM {catalog}.compliance.calculate_safeguard_exposure(
-                '{safe_company}', {reduction}
-            )
-        """
-
-    elif intent == "company_profile":
-        company = None
-        for c in known_companies:
-            if c in msg_lower:
-                company = c
-                break
-
-        if company:
-            safe_company = _sanitize(company)
-            return f"""
-                SELECT 'enforcement' as source, company_name as entity,
-                       action_type as detail, penalty_aud as metric, action_date as date_val
-                FROM {get_fqn('enforcement_actions')}
-                WHERE LOWER(company_name) LIKE '%{safe_company}%'
-                UNION ALL
-                SELECT 'emissions' as source, corporation_name as entity,
-                       CONCAT('Scope 1: ', CAST(scope1_emissions_tco2e AS STRING), ' tCO2e') as detail,
-                       scope1_emissions_tco2e as metric, NULL as date_val
-                FROM {get_fqn('emissions_data')}
-                WHERE LOWER(corporation_name) LIKE '%{safe_company}%'
-                LIMIT 20
-            """
-
-    # Default: summary
-    return f"""
-        SELECT * FROM {get_fqn('compliance_insights')}
-        ORDER BY severity DESC, metric_value DESC
-        LIMIT 15
-    """
-
-
-# ── Chat function ────────────────────────────────────────────────────────────
-
-def _build_context(intent: str, message: str, market: str = "AU") -> tuple[str, list]:
-    """Build context string from data query. Returns (context, rows)."""
-    region = get_region(market)
-    rows = []
     try:
-        if region.data_available:
-            sql = _build_context_query(intent, message, market)
-            rows = execute_query(sql)
+        if intent == "emissions":
+            filters: dict = {}
+            state_match = re.search(
+                r"\b(nsw|vic|qld|sa|wa|tas|nt|act|central|north|south|east|west|"
+                r"luzon|visayas|mindanao|tokyo|kansai|kyushu|hokkaido)\b", msg_lower
+            )
+            if state_match:
+                filters["state"] = f"%{state_match.group(1)}%"
+            fuel_match = re.search(r"\b(coal|gas|hydro|wind|solar|geothermal|oil|nuclear|lng)\b", msg_lower)
+            if fuel_match:
+                filters["primary_fuel_source"] = f"%{fuel_match.group(1)}%"
+            rows = mem.query("emissions_data", market=market, filters=filters,
+                             sort_by="scope1_emissions_tco2e", limit=20)
+
+        elif intent == "notices":
+            filters = {}
+            if re.search(r"non.?conformance", msg_lower):
+                filters["notice_type"] = "%NON-CONFORM%"
+            elif "suspension" in msg_lower:
+                filters["notice_type"] = "%SUSPENSION%"
+            elif "direction" in msg_lower:
+                filters["notice_type"] = "%DIRECTION%"
+            rows = mem.query("market_notices", market=market, filters=filters,
+                             sort_by="creation_date", limit=20)
+            for r in rows:
+                for k in ("creation_date", "issue_date"):
+                    if r.get(k) and not isinstance(r[k], str):
+                        r[k] = str(r[k])
+
+        elif intent == "enforcement":
+            filters = {}
+            for company in known_companies:
+                if company in msg_lower:
+                    filters["company_name"] = f"%{company}%"
+                    break
+            rows = mem.query("enforcement_actions", market=market, filters=filters,
+                             sort_by="penalty_aud", limit=20)
+            for r in rows:
+                if r.get("action_date") and not isinstance(r["action_date"], str):
+                    r["action_date"] = str(r["action_date"])
+
+        elif intent == "obligations":
+            filters = {}
+            for reg in region.regulators:
+                if reg.code.lower() in msg_lower:
+                    filters["regulatory_body"] = reg.code
+                    break
+            cat_match = re.search(r"\b(market|safety|environment|technical|financial|consumer|network)\b", msg_lower)
+            if cat_match:
+                filters["category"] = f"%{cat_match.group(1)}%"
+            rows = mem.query("regulatory_obligations", market=market, filters=filters,
+                             sort_by="penalty_max_aud", limit=20)
+
+        elif intent == "company_profile":
+            company = next((c for c in known_companies if c in msg_lower), None)
+            if company:
+                enf = mem.query("enforcement_actions", market=market,
+                                filters={"company_name": f"%{company}%"}, limit=10)
+                emi = mem.query("emissions_data", market=market,
+                                filters={"corporation_name": f"%{company}%"}, limit=10)
+                rows = [{**r, "source": "enforcement"} for r in enf] + [{**r, "source": "emissions"} for r in emi]
+
+        elif intent == "safeguard_forecast":
+            company = next((c for c in known_companies if c in msg_lower), None)
+            if company:
+                rows = mem.query("emissions_data", market=market,
+                                 filters={"corporation_name": f"%{company}%"}, limit=5)
+            else:
+                rows = mem.query("emissions_data", market=market,
+                                 sort_by="scope1_emissions_tco2e", limit=5)
+
+        else:  # summary
+            enf_rows = mem.query("enforcement_actions", market=market, sort_by="penalty_aud", limit=5)
+            obl_rows = mem.query("regulatory_obligations", market=market,
+                                 filters={"risk_rating": "Critical"}, sort_by="penalty_max_aud", limit=5)
+            rows = enf_rows + obl_rows
+
         if rows:
-            context_lines = []
-            for row in rows[:15]:
-                context_lines.append(" | ".join(f"{k}: {v}" for k, v in row.items() if v is not None))
+            context_lines = [
+                " | ".join(f"{k}: {v}" for k, v in row.items() if v is not None)
+                for row in rows[:15]
+            ]
             context = "\n".join(context_lines)
         else:
-            context = f"No data loaded for {region.name} market. Answer from regulatory knowledge."
+            context = (
+                f"No specific records matched for {region.name}. "
+                f"Answer from your knowledge of {region.name} energy regulations and {region.market_name}."
+            )
+
     except Exception as e:
-        logger.error(f"Query failed: {e}")
-        context = f"Data query encountered an error: {str(e)}"
+        logger.error(f"Context build failed: {e}")
+        context = f"Data temporarily unavailable. Answer from regulatory knowledge of {region.name}."
+
     return context, rows
 
 

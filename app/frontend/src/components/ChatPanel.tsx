@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { useChatHistory, StoredMessage } from "../hooks/useChatHistory";
-import { useRole, ROLE_LABELS, UserRole } from "../hooks/useRole";
+import { useRole, ROLE_LABELS, ROLE_CHIPS, UserRole } from "../hooks/useRole";
 import { useRegion } from "../context/RegionContext";
 
 function buildWelcome(regionDetail: Record<string, any> | null, marketCode: string): string {
@@ -38,17 +38,53 @@ const ROLE_OPTIONS: { value: NonNullable<UserRole>; label: string; desc: string 
 ];
 
 export default function ChatPanel() {
-  const { messages, addMessage, updateLast, clearHistory, replaceWelcome } = useChatHistory(DEFAULT_WELCOME);
-  const { role, setRole, chips } = useRole();
-  const { market } = useRegion();
+  const { messages, addMessage, updateLast, clearHistory, replaceWelcome, resetToWelcome } = useChatHistory(DEFAULT_WELCOME);
+  const { role, setRole } = useRole();
+  const { market, activeMarket } = useRegion();
 
-  // Update the welcome message whenever the market changes
+  // Clear chat and update welcome whenever the market changes
   useEffect(() => {
     fetch(`/api/regions/${market}`)
       .then((r) => r.ok ? r.json() : Promise.reject())
-      .then((detail) => replaceWelcome(buildWelcome(detail, market)))
+      .then((detail) => resetToWelcome(buildWelcome(detail, market)))
       .catch(() => {});
   }, [market]);
+
+  // Build market-aware prompt chips
+  const chips = useMemo(() => {
+    const regs = (activeMarket as any)?.regulators?.map((r: any) => r.code) ?? [];
+    const companies: string[] = (activeMarket as any)?.known_companies ?? [];
+    const mktName = (activeMarket as any)?.name ?? market;
+    const schemeLabel = (activeMarket as any)?.carbon_scheme?.name ?? "carbon scheme";
+    const emissionsReg = regs.find((r: string) => ["CER","NEA","MoEFCC","MOE","NIER","ONEP","EMB"].includes(r)) ?? regs[0] ?? "regulator";
+    const marketOp = regs.find((r: string) => ["AEMO","EMA","EA","OCCTO","CERC","EGAT","NGCP"].includes(r)) ?? regs[1] ?? regs[0] ?? "market operator";
+    const enforcementReg = regs.find((r: string) => ["AER","EMA","Commerce Commission","METI","CERC"].includes(r)) ?? regs[0] ?? "regulator";
+    const company0 = companies[0] ?? "energy company";
+    const company1 = companies[1] ?? companies[0] ?? "energy company";
+
+    if (role) {
+      const base = ROLE_CHIPS[role];
+      return base.map((chip) =>
+        chip
+          .replace(/\bAGL\b/g, company0)
+          .replace(/\bAER\b/g, enforcementReg)
+          .replace(/\bAEMO\b/g, marketOp)
+          .replace(/\bCER\b/g, emissionsReg)
+          .replace(/\bSafeguard( Mechanism)?\b/g, schemeLabel)
+          .replace(/\bNER\s+Chapter\s+\d+\b/g, `${mktName} energy market rules`)
+          .replace(/\bNGER\b/g, `${emissionsReg} emissions reporting`)
+          .replace(/\bNERL\b|\bNERR\b/g, `${mktName} retail rules`)
+      );
+    }
+
+    // Default chips for this market
+    return [
+      `Who are the top 10 emitters in the ${mktName} electricity sector?`,
+      `Show recent ${marketOp} non-conformance notices`,
+      `Which companies have been fined the most by ${enforcementReg}?`,
+      `What are the key obligations under the ${schemeLabel}?`,
+    ];
+  }, [role, market, activeMarket]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [showRoleSelector, setShowRoleSelector] = useState(false);
