@@ -3,7 +3,6 @@ import {
   ResponsiveContainer, Cell, PieChart, Pie, Legend,
 } from "recharts";
 import { useApi } from "../hooks/useApi";
-import { useRegion } from "../context/RegionContext";
 
 interface ChartsData {
   penalty_trend: { year: string; total_penalty: number; count: number }[];
@@ -121,8 +120,7 @@ function BreachTypesChart({ data }: { data: ChartsData["breach_types"] }) {
 }
 
 export default function DashboardCharts() {
-  const { market } = useRegion();
-  const { data, loading } = useApi<ChartsData>(`/api/dashboard-charts?market=${market}`);
+  const { data, loading } = useApi<ChartsData>("/api/dashboard-charts");
 
   if (loading || !data) {
     return (
