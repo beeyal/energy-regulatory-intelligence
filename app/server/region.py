@@ -1,25 +1,12 @@
 """
-Region configuration loader for multi-market support.
-Reads region.yaml and exposes typed RegionConfig objects.
+Region configuration for multi-market support.
+Data lives in region_data.py as a plain Python dict — no external dependencies.
 """
 
-import os
 from functools import lru_cache
-from pathlib import Path
-from typing import Any
-
-try:
-    import yaml as _yaml
-    def _parse_yaml(text: str):
-        return _yaml.safe_load(text)
-except ImportError:
-    import json, re as _re
-    def _parse_yaml(text: str):  # type: ignore[misc]
-        raise RuntimeError(
-            "pyyaml is not installed. Add pyyaml>=6.0 to requirements.txt."
-        )
-
 from pydantic import BaseModel
+
+from .region_data import MARKETS
 
 
 class CarbonScheme(BaseModel):
@@ -58,33 +45,17 @@ class RegionConfig(BaseModel):
     def regulator_codes(self) -> list[str]:
         return [r.code for r in self.regulators]
 
-    @property
-    def regulator_summary(self) -> str:
-        return ", ".join(f"{r.code} ({r.domain})" for r in self.regulators)
-
-
-@lru_cache(maxsize=1)
-def _load_yaml() -> dict[str, Any]:
-    yaml_path = Path(__file__).parent.parent / "region.yaml"
-    with open(yaml_path) as f:
-        return _parse_yaml(f.read())
-
 
 @lru_cache(maxsize=32)
 def get_region(market_code: str) -> RegionConfig:
     """Return RegionConfig for a market code. Falls back to AU if unknown."""
-    data = _load_yaml()
-    markets = data.get("markets", {})
-    code = market_code.upper() if market_code else "AU"
-    if code not in markets:
-        code = "AU"
-    raw = markets[code]
-    return RegionConfig(code=code, **raw)
+    code = (market_code or "AU").upper()
+    raw = MARKETS.get(code) or MARKETS["AU"]
+    return RegionConfig(code=code if code in MARKETS else "AU", **raw)
 
 
 def list_markets() -> list[dict[str, str]]:
-    """Return summary list of all available markets for the region switcher."""
-    data = _load_yaml()
+    """Return summary list of all markets for the region switcher API."""
     return [
         {
             "code": code,
@@ -93,7 +64,7 @@ def list_markets() -> list[dict[str, str]]:
             "market_name": info["market_name"],
             "data_available": str(info.get("data_available", False)).lower(),
         }
-        for code, info in data.get("markets", {}).items()
+        for code, info in MARKETS.items()
     ]
 
 
@@ -115,27 +86,20 @@ def build_system_prompt(region: RegionConfig, context: str) -> str:
         f"  - {r.code}: {r.name} — {r.domain}" for r in region.regulators
     )
 
-    return f"""{region.system_prompt_context}
-
-REGULATORS:
-{regulators}
-
-KEY LEGISLATION:
-{legislation}
-
-CARBON SCHEME: {region.carbon_scheme.name}
-  Operator: {region.carbon_scheme.operator}
-  Price: {region.currency} {region.carbon_scheme.price}/{region.carbon_scheme.price_unit.split('/')[-1]}
-{f'  Roadmap: {region.carbon_scheme.roadmap}' if region.carbon_scheme.roadmap else ''}
-
-When answering:
-- Reference specific data points (company names, figures, dates)
-- Cite regulatory references specific to {region.name}
-- Highlight compliance risks and patterns
-- Use {region.currency} for monetary values
-- Be concise but thorough
-{data_note}
-
-DATA CONTEXT:
-{{context}}
-""".format(context=context)
+    return (
+        f"{region.system_prompt_context}\n\n"
+        f"REGULATORS:\n{regulators}\n\n"
+        f"KEY LEGISLATION:\n{legislation}\n\n"
+        f"CARBON SCHEME: {region.carbon_scheme.name}\n"
+        f"  Operator: {region.carbon_scheme.operator}\n"
+        f"  Price: {region.currency} {region.carbon_scheme.price}"
+        f" per {region.carbon_scheme.price_unit.split('/')[-1]}\n"
+        + (f"  Roadmap: {region.carbon_scheme.roadmap}\n" if region.carbon_scheme.roadmap else "")
+        + f"\nWhen answering:\n"
+        f"- Reference specific data points (company names, figures, dates)\n"
+        f"- Cite regulatory references specific to {region.name}\n"
+        f"- Use {region.currency} for monetary values\n"
+        f"- Be concise but thorough\n"
+        f"{data_note}\n\n"
+        f"DATA CONTEXT:\n{context}"
+    )
