@@ -5,13 +5,28 @@ Uses Databricks Foundation Model API via OpenAI-compatible endpoint.
 
 import logging
 import re
+from typing import Generator
 
+import mlflow
 from openai import OpenAI
 
 from .config import get_fqn, get_model_endpoint, get_workspace_client
 from .db import execute_query
 
 logger = logging.getLogger(__name__)
+
+
+# ── OpenAI client factory ──────────────────────────────────────────────────
+
+def _get_openai_client() -> OpenAI:
+    """Create an authenticated OpenAI client pointing at the Databricks endpoint."""
+    from .config import get_oauth_token, get_workspace_host
+    token = get_oauth_token()
+    host = get_workspace_host()
+    return OpenAI(
+        api_key=token,
+        base_url=f"{host}/serving-endpoints",
+    )
 
 
 # ── Input sanitisation ──────────────────────────────────────────────────────
@@ -46,6 +61,11 @@ INTENT_PATTERNS = {
         r"who\s+is", r"tell\s+me\s+about", r"repeat\s+offender",
         r"company\s+profile", r"history\s+of",
     ],
+    "safeguard_forecast": [
+        r"safeguard", r"baseline", r"breach", r"shortfall",
+        r"what.*if.*reduc", r"what.*happen.*if", r"forecast.*emission",
+        r"accu", r"what.*exposure", r"trajectory",
+    ],
     "summary": [
         r"summary", r"report", r"status", r"overview", r"dashboard",
     ],
@@ -64,18 +84,25 @@ def classify_intent(message: str) -> str:
     """Classify user message into a query intent."""
     msg_lower = message.lower()
 
-    # Check for company name mentions — route to company_profile
-    for company in KNOWN_COMPANIES:
-        if company in msg_lower:
-            return "company_profile"
-
-    # Check pattern matches
+    # Check pattern matches first (safeguard_forecast etc. take priority over company names)
     scores = {}
     for intent, patterns in INTENT_PATTERNS.items():
         score = sum(1 for p in patterns if re.search(p, msg_lower))
         if score > 0:
             scores[intent] = score
 
+    # High-confidence pattern match wins over company name detection
+    if scores:
+        best_intent = max(scores, key=scores.get)
+        if scores[best_intent] >= 2 or best_intent == "safeguard_forecast":
+            return best_intent
+
+    # Check for company name mentions — route to company_profile
+    for company in KNOWN_COMPANIES:
+        if company in msg_lower:
+            return "company_profile"
+
+    # Fall back to best pattern match if any
     if scores:
         return max(scores, key=scores.get)
 
@@ -166,6 +193,29 @@ def _build_context_query(intent: str, message: str) -> str:
             LIMIT 20
         """
 
+    elif intent == "safeguard_forecast":
+        # Use UC Function for Safeguard Mechanism forecasting
+        company = None
+        for c in KNOWN_COMPANIES:
+            if c in msg_lower:
+                company = c
+                break
+        company = company or "AGL"
+
+        # Parse reduction rate if mentioned
+        reduction = 0.02
+        rate_match = re.search(r"(\d+)\s*%", msg_lower)
+        if rate_match:
+            reduction = int(rate_match.group(1)) / 100
+
+        safe_company = _sanitize(company)
+        catalog = get_fqn("").rsplit(".", 2)[0]
+        return f"""
+            SELECT * FROM {catalog}.compliance.calculate_safeguard_exposure(
+                '{safe_company}', {reduction}
+            )
+        """
+
     elif intent == "company_profile":
         # Find mentioned company
         company = None
@@ -221,18 +271,13 @@ DATA CONTEXT:
 """
 
 
-def chat(message: str) -> str:
-    """Process a chat message: classify intent, query data, generate response."""
-    intent = classify_intent(message)
-    logger.info(f"Classified intent: {intent}")
-
-    # Build and execute context query
+def _build_context(intent: str, message: str) -> tuple[str, list]:
+    """Build context string from data query. Returns (context, rows)."""
     sql = _build_context_query(intent, message)
     rows = []
     try:
         rows = execute_query(sql)
         if rows:
-            # Format as readable text for LLM context
             context_lines = []
             for row in rows[:15]:
                 context_lines.append(" | ".join(f"{k}: {v}" for k, v in row.items() if v is not None))
@@ -242,17 +287,45 @@ def chat(message: str) -> str:
     except Exception as e:
         logger.error(f"Query failed: {e}")
         context = f"Data query encountered an error: {str(e)}"
+    return context, rows
+
+
+def _fallback_response(intent: str, rows: list) -> str:
+    """Generate a markdown-table fallback when the LLM is unavailable."""
+    if rows:
+        headers = list(rows[0].keys())
+        display_rows = rows[:10]
+
+        header_line = "| " + " | ".join(headers) + " |"
+        separator = "| " + " | ".join("---" for _ in headers) + " |"
+        data_lines = []
+        for r in display_rows:
+            data_lines.append("| " + " | ".join(str(r.get(h, "")) for h in headers) + " |")
+
+        table = "\n".join([header_line, separator] + data_lines)
+
+        return (
+            f"**Query Results — {intent.replace('_', ' ').title()}**\n\n"
+            f"The LLM service is temporarily unavailable. "
+            f"Below is a summary of the {len(rows)} matching record(s) retrieved from the database.\n\n"
+            f"{table}\n\n"
+            f"*Showing {len(display_rows)} of {len(rows)} records.*"
+        )
+    return "I encountered an error processing your request. Please try again."
+
+
+@mlflow.trace(name="compliance_copilot")
+def chat(message: str) -> str:
+    """Process a chat message: classify intent, query data, generate response."""
+    intent = classify_intent(message)
+    logger.info(f"Classified intent: {intent}")
+    mlflow.update_current_trace(tags={"intent": intent})
+
+    context, rows = _build_context(intent, message)
 
     # Call LLM
     try:
-        from .config import get_oauth_token, get_workspace_host
-        token = get_oauth_token()
-        host = get_workspace_host()
-        client = OpenAI(
-            api_key=token,
-            base_url=f"{host}/serving-endpoints",
-        )
-
+        client = _get_openai_client()
         response = client.chat.completions.create(
             model=get_model_endpoint(),
             messages=[
@@ -262,30 +335,39 @@ def chat(message: str) -> str:
             max_tokens=1024,
             temperature=0.3,
         )
-
         return response.choices[0].message.content
 
     except Exception as e:
         logger.error(f"LLM call failed: {e}")
-        # Fallback: return formatted data summary as a markdown table
-        if rows:
-            headers = list(rows[0].keys())
-            display_rows = rows[:10]
+        return _fallback_response(intent, rows)
 
-            # Build markdown table
-            header_line = "| " + " | ".join(headers) + " |"
-            separator = "| " + " | ".join("---" for _ in headers) + " |"
-            data_lines = []
-            for r in display_rows:
-                data_lines.append("| " + " | ".join(str(r.get(h, "")) for h in headers) + " |")
 
-            table = "\n".join([header_line, separator] + data_lines)
+@mlflow.trace(name="compliance_copilot_stream")
+def chat_stream(message: str) -> Generator[str, None, None]:
+    """Stream a chat response token-by-token. Yields text chunks."""
+    intent = classify_intent(message)
+    logger.info(f"Classified intent (stream): {intent}")
+    mlflow.update_current_trace(tags={"intent": intent})
 
-            return (
-                f"**Query Results — {intent.replace('_', ' ').title()}**\n\n"
-                f"The LLM service is temporarily unavailable. "
-                f"Below is a summary of the {len(rows)} matching record(s) retrieved from the database.\n\n"
-                f"{table}\n\n"
-                f"*Showing {len(display_rows)} of {len(rows)} records.*"
-            )
-        return "I encountered an error processing your request. Please try again."
+    context, rows = _build_context(intent, message)
+
+    try:
+        client = _get_openai_client()
+        stream = client.chat.completions.create(
+            model=get_model_endpoint(),
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT.format(context=context)},
+                {"role": "user", "content": message},
+            ],
+            max_tokens=1024,
+            temperature=0.3,
+            stream=True,
+        )
+
+        for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+
+    except Exception as e:
+        logger.error(f"Streaming LLM call failed: {e}")
+        yield _fallback_response(intent, rows)

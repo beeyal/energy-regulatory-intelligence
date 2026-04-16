@@ -1,0 +1,60 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Energy Compliance Intelligence Hub — Databricks App Resource
+# ─────────────────────────────────────────────────────────────────────────────
+# Deployed via:  databricks bundle deploy -t <target>
+# ─────────────────────────────────────────────────────────────────────────────
+
+resources:
+  apps:
+    energy-compliance-hub:
+      name: energy-compliance-hub
+      description: >
+        Real-data compliance intelligence hub for APJ energy markets.
+        Surfaces emissions, enforcement actions, market notices, and regulatory
+        obligations powered by Unity Catalog and Foundation Model APIs.
+
+      source_code_path: ../app
+
+      config:
+        command:
+          - uvicorn
+          - app:app
+          - --host
+          - 0.0.0.0
+          - --port
+          - 8000
+        env:
+          - name: COMPLIANCE_CATALOG
+            value: ${var.catalog}
+          - name: COMPLIANCE_SCHEMA
+            value: ${var.schema}
+          - name: MODEL_SERVING_ENDPOINT
+            value: ${var.serving_endpoint}
+          - name: DATABRICKS_WAREHOUSE_ID
+            value: ${resources.sql_warehouses.compliance_warehouse.id}
+
+      resources:
+        - name: compliance-warehouse
+          description: SQL warehouse for compliance queries
+          sql_warehouse:
+            id: ${resources.sql_warehouses.compliance_warehouse.id}
+            permission: CAN_USE
+
+      permissions:
+        - user_name: ${workspace.current_user.userName}
+          level: CAN_MANAGE
+
+  sql_warehouses:
+    compliance_warehouse:
+      name: "[${bundle.target}] Compliance Hub Warehouse"
+      cluster_size: ${var.warehouse_size}
+      max_num_clusters: 1
+      auto_stop_mins: 10
+      warehouse_type: PRO
+      enable_serverless_compute: true
+      tags:
+        custom_tags:
+          - key: project
+            value: energy-compliance-hub
+          - key: team
+            value: apj-buildathon

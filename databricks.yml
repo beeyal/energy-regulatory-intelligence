@@ -1,0 +1,96 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Energy Compliance Intelligence Hub — Databricks Asset Bundle
+# ─────────────────────────────────────────────────────────────────────────────
+# One-command deployment:  databricks bundle deploy -t dev
+# ─────────────────────────────────────────────────────────────────────────────
+
+bundle:
+  name: energy-compliance-hub
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Unity Catalog catalog name for compliance data
+    default: main
+  schema:
+    description: Schema name within the catalog
+    default: compliance
+  warehouse_size:
+    description: SQL warehouse T-shirt size (2X-Small, X-Small, Small, Medium, Large)
+    default: X-Small
+  serving_endpoint:
+    description: Model serving endpoint for LLM-powered compliance analysis
+    default: databricks-meta-llama-3-3-70b-instruct
+
+workspace:
+  root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+
+resources:
+  jobs:
+    setup_compliance_tables:
+      name: "[${bundle.target}] Energy Compliance — Setup Tables"
+      description: >
+        Ingests emissions, enforcement, market notice, and regulatory obligation
+        data into Unity Catalog Delta tables for the compliance hub.
+      tasks:
+        - task_key: setup_tables
+          python_wheel_task:
+            entry_point: setup_tables
+          existing_cluster_id: ""  # overridden per-target or uses serverless
+          spark_python_task:
+            python_file: scripts/setup_tables.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}
+          libraries:
+            - pypi:
+                package: databricks-connect
+            - pypi:
+                package: requests
+            - pypi:
+                package: pandas
+            - pypi:
+                package: openpyxl
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"
+        timezone_id: Australia/Sydney
+      tags:
+        project: energy-compliance-hub
+        team: apj-buildathon
+
+targets:
+  dev:
+    mode: development
+    default: true
+    variables:
+      catalog: dev_compliance
+      warehouse_size: 2X-Small
+    resources:
+      jobs:
+        setup_compliance_tables:
+          # Dev: run on-demand only, no schedule
+          schedule: null
+
+  staging:
+    variables:
+      catalog: staging_compliance
+      warehouse_size: X-Small
+    resources:
+      jobs:
+        setup_compliance_tables:
+          schedule:
+            quartz_cron_expression: "0 0 6 * * ?"
+            timezone_id: Australia/Sydney
+
+  prod:
+    mode: production
+    variables:
+      catalog: prod_compliance
+      warehouse_size: Small
+      serving_endpoint: databricks-meta-llama-3-3-70b-instruct
+    run_as:
+      service_principal_name: energy-compliance-hub-sp

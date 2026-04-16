@@ -1,23 +1,25 @@
 import { useState, useEffect } from "react";
+import RiskHeatMap from "./components/RiskHeatMap";
 import EmissionsOverview from "./components/EmissionsOverview";
+import EmissionsForecaster from "./components/EmissionsForecaster";
 import MarketNotices from "./components/MarketNotices";
 import EnforcementTracker from "./components/EnforcementTracker";
 import ObligationRegister from "./components/ObligationRegister";
 import ComplianceGaps from "./components/ComplianceGaps";
 import ChatPanel from "./components/ChatPanel";
 
-type Tab = "emissions" | "notices" | "enforcement" | "obligations" | "gaps";
+type Tab = "risk" | "emissions" | "forecast" | "notices" | "enforcement" | "obligations" | "gaps";
 
 interface Metadata {
-  emissions_count?: number;
-  notices_count?: number;
-  enforcement_count?: number;
-  obligations_count?: number;
+  tables?: Record<string, string | number>;
+  catalog?: string;
 }
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: "risk", label: "Risk Overview" },
   { id: "gaps", label: "Compliance Insights" },
   { id: "emissions", label: "Emissions" },
+  { id: "forecast", label: "Safeguard Forecast" },
   { id: "notices", label: "Market Notices" },
   { id: "enforcement", label: "Enforcement" },
   { id: "obligations", label: "Obligations" },
@@ -25,7 +27,9 @@ const TABS: { id: Tab; label: string }[] = [
 
 function TabContent({ tab }: { tab: Tab }) {
   switch (tab) {
+    case "risk": return <RiskHeatMap />;
     case "emissions": return <EmissionsOverview />;
+    case "forecast": return <EmissionsForecaster />;
     case "notices": return <MarketNotices />;
     case "enforcement": return <EnforcementTracker />;
     case "obligations": return <ObligationRegister />;
@@ -34,7 +38,7 @@ function TabContent({ tab }: { tab: Tab }) {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Tab>("gaps");
+  const [activeTab, setActiveTab] = useState<Tab>("risk");
   const [metadata, setMetadata] = useState<Metadata | null>(null);
 
   useEffect(() => {
@@ -48,17 +52,17 @@ export default function App() {
     <div className="app-container">
       <div className="app-header">
         <div>
-          <h1>Energy Compliance Intelligence Hub</h1>
-          <div className="subtitle">Australian energy regulatory data — CER, AEMO, AER</div>
-          {metadata && (
+          <h1>Regulatory Intelligence Command Center</h1>
+          <div className="subtitle">AI-powered compliance monitoring — CER, AEMO, AER, AEMC</div>
+          {metadata?.tables && (
             <div className="data-source-banner">
-              <span>{metadata.emissions_count} emissions</span>
+              <span>{metadata.tables.emissions_data || 0} emissions</span>
               <span className="dot" />
-              <span>{metadata.notices_count} notices</span>
+              <span>{metadata.tables.market_notices || 0} notices</span>
               <span className="dot" />
-              <span>{metadata.enforcement_count} enforcement</span>
+              <span>{metadata.tables.enforcement_actions || 0} enforcement</span>
               <span className="dot" />
-              <span>{metadata.obligations_count} obligations</span>
+              <span>{metadata.tables.regulatory_obligations || 0} obligations</span>
             </div>
           )}
         </div>

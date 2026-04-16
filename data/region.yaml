@@ -1,0 +1,671 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Energy Compliance Intelligence Hub — APJ Region Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+# Each region defines regulatory bodies, data sources, key legislation,
+# major companies, and carbon-scheme metadata.  The app reads this file at
+# startup so new regions can be added without code changes (reusability).
+# ─────────────────────────────────────────────────────────────────────────────
+
+regions:
+
+  # ── 1. AUSTRALIA ──────────────────────────────────────────────────────────
+  australia:
+    display_name: Australia
+    iso_code: AU
+    timezone: Australia/Sydney
+    currency: AUD
+
+    regulators:
+      - name: Clean Energy Regulator
+        abbrev: CER
+        url: https://www.cleanenergyregulator.gov.au
+        scope: emissions reporting, NGER, safeguard mechanism
+      - name: Australian Energy Regulator
+        abbrev: AER
+        url: https://www.aer.gov.au
+        scope: retail and network regulation, enforcement
+      - name: Australian Energy Market Commission
+        abbrev: AEMC
+        url: https://www.aemc.gov.au
+        scope: rule-making, market design
+      - name: Australian Energy Market Operator
+        abbrev: AEMO
+        url: https://www.aemo.com.au
+        scope: system operations, market notices, ISP
+
+    emissions_source:
+      provider: CER
+      dataset: National Greenhouse and Energy Reporting (NGER)
+      api: https://www.cleanenergyregulator.gov.au/NGER/National%20greenhouse%20and%20energy%20reporting%20data
+      format: xlsx
+      frequency: annual
+
+    enforcement_source:
+      provider: AER
+      dataset: AER Compliance and Enforcement Register
+      url: https://www.aer.gov.au/about-us/compliance-enforcement
+      format: csv
+      frequency: quarterly
+
+    market_notices:
+      provider: AEMO
+      api: https://aemo.com.au/aemo/apps/api/report/CURRENT_NOTICE
+      format: json
+      frequency: real-time
+
+    rules_corpus:
+      - National Electricity Law (NEL)
+      - National Electricity Rules (NER)
+      - National Gas Law (NGL)
+      - National Energy Retail Law (NERL)
+      - National Greenhouse and Energy Reporting Act 2007
+      - Safeguard Mechanism (Safeguard) Rule 2015
+      - Climate Change Act 2022
+      - Renewable Energy (Electricity) Act 2000
+
+    key_companies:
+      - name: AGL Energy
+        ticker: ASX:AGL
+        segment: generation, retail
+      - name: Origin Energy
+        ticker: ASX:ORG
+        segment: generation, retail, LNG
+      - name: EnergyAustralia
+        parent: CLP Group
+        segment: generation, retail
+      - name: Alinta Energy
+        parent: Chow Tai Fook Enterprises
+        segment: generation, retail
+      - name: Ausgrid
+        segment: distribution network
+
+    carbon_scheme:
+      name: Safeguard Mechanism
+      authority: CER
+      type: baseline-and-credit
+      units: Australian Carbon Credit Units (ACCUs)
+      target: 4.9% annual decline in baselines to net zero by 2050
+      legislation: Safeguard Mechanism (Crediting) Amendment Act 2023
+
+    notes: >
+      Australia's NEM covers five interconnected states (QLD, NSW, VIC, SA, TAS).
+      WA operates a separate Wholesale Electricity Market (WEM) under AEMO.
+
+  # ── 2. NEW ZEALAND ───────────────────────────────────────────────────────
+  new_zealand:
+    display_name: New Zealand
+    iso_code: NZ
+    timezone: Pacific/Auckland
+    currency: NZD
+
+    regulators:
+      - name: Electricity Authority
+        abbrev: EA
+        url: https://www.ea.govt.nz
+        scope: electricity market regulation, pricing
+      - name: Commerce Commission
+        abbrev: ComCom
+        url: https://comcom.govt.nz
+        scope: network regulation, competition
+      - name: Environmental Protection Authority
+        abbrev: EPA_NZ
+        url: https://www.epa.govt.nz
+        scope: ETS administration, hazardous substances
+      - name: Gas Industry Company
+        abbrev: GIC
+        url: https://www.gasindustry.co.nz
+        scope: gas market governance
+
+    emissions_source:
+      provider: EPA_NZ
+      dataset: NZ Emissions Trading Scheme (NZ ETS) Register
+      url: https://www.epa.govt.nz/industry-areas/emissions-trading-scheme
+      format: csv
+      frequency: annual
+
+    enforcement_source:
+      provider: EA
+      dataset: EA Compliance Monitoring Reports
+      url: https://www.ea.govt.nz/monitoring/compliance
+      format: pdf
+      frequency: quarterly
+
+    market_notices:
+      provider: EA
+      url: https://www.ea.govt.nz/operations/market-operation-service-providers
+      format: html
+      frequency: daily
+
+    rules_corpus:
+      - Electricity Industry Act 2010
+      - Electricity Industry Participation Code
+      - Climate Change Response Act 2002
+      - Gas Act 1992
+      - Resource Management Act 1991
+      - NZ ETS Regulations
+
+    key_companies:
+      - name: Genesis Energy
+        ticker: NZX:GNE
+        segment: generation, retail
+      - name: Mercury NZ
+        ticker: NZX:MCY
+        segment: generation (hydro, geothermal)
+      - name: Meridian Energy
+        ticker: NZX:MEL
+        segment: generation (hydro, wind)
+      - name: Contact Energy
+        ticker: NZX:CEN
+        segment: generation, retail
+      - name: Manawa Energy
+        ticker: NZX:MNW
+        segment: generation (hydro, wind)
+
+    carbon_scheme:
+      name: New Zealand Emissions Trading Scheme (NZ ETS)
+      authority: EPA_NZ
+      type: cap-and-trade
+      units: New Zealand Units (NZUs)
+      target: net zero greenhouse gases (excl. biogenic methane) by 2050
+      legislation: Climate Change Response Act 2002
+
+    notes: >
+      NZ is ~82% renewable electricity (hydro, geothermal, wind).
+      The Electricity Authority runs the wholesale spot market with five pricing nodes.
+
+  # ── 3. SINGAPORE ─────────────────────────────────────────────────────────
+  singapore:
+    display_name: Singapore
+    iso_code: SG
+    timezone: Asia/Singapore
+    currency: SGD
+
+    regulators:
+      - name: Energy Market Authority
+        abbrev: EMA
+        url: https://www.ema.gov.sg
+        scope: electricity and gas market regulation
+      - name: National Environment Agency
+        abbrev: NEA
+        url: https://www.nea.gov.sg
+        scope: environmental protection, carbon tax admin
+      - name: National Climate Change Secretariat
+        abbrev: NCCS
+        url: https://www.nccs.gov.sg
+        scope: climate policy coordination
+
+    emissions_source:
+      provider: NEA
+      dataset: Singapore Carbon Tax Reporting
+      url: https://www.nea.gov.sg/our-services/climate-change-energy-efficiency/climate-change
+      format: pdf
+      frequency: annual
+
+    enforcement_source:
+      provider: EMA
+      dataset: EMA Enforcement Actions
+      url: https://www.ema.gov.sg/regulations-enforcement
+      format: html
+      frequency: as-published
+
+    market_notices:
+      provider: EMA
+      url: https://www.emcsg.com/MarketData
+      format: html
+      frequency: real-time
+
+    rules_corpus:
+      - Electricity Act (Cap. 89A)
+      - Gas Act (Cap. 116A)
+      - Energy Conservation Act 2012
+      - Carbon Pricing Act 2018
+      - Singapore Green Plan 2030
+
+    key_companies:
+      - name: Senoko Energy
+        segment: generation
+      - name: YTL PowerSeraya
+        parent: YTL Power International
+        segment: generation, retail
+      - name: Tuas Power
+        parent: China Huaneng Group
+        segment: generation, retail
+      - name: Keppel Infrastructure
+        parent: Keppel Corporation
+        segment: gas, infrastructure
+      - name: PacificLight Power
+        parent: FPM Power Holdings
+        segment: generation
+
+    carbon_scheme:
+      name: Singapore Carbon Tax
+      authority: NEA
+      type: carbon tax
+      rate: SGD 25/tCO2e (2024-25), rising to SGD 45 (2026-27), SGD 50-80 (2030)
+      threshold: facilities emitting >= 25,000 tCO2e/year
+      legislation: Carbon Pricing Act 2018
+
+    notes: >
+      Singapore imports ~95% of energy needs. The National Electricity Market of Singapore
+      (NEMS) is a wholesale spot market run by the Energy Market Company (EMC).
+
+  # ── 4. JAPAN ─────────────────────────────────────────────────────────────
+  japan:
+    display_name: Japan
+    iso_code: JP
+    timezone: Asia/Tokyo
+    currency: JPY
+
+    regulators:
+      - name: Ministry of Economy, Trade and Industry
+        abbrev: METI
+        url: https://www.meti.go.jp
+        scope: energy policy, electricity and gas market
+      - name: Organization for Cross-regional Coordination of Transmission Operators
+        abbrev: OCCTO
+        url: https://www.occto.or.jp
+        scope: grid coordination, supply-demand balancing
+      - name: Electricity and Gas Market Surveillance Commission
+        abbrev: EGC
+        url: https://www.emsc.meti.go.jp
+        scope: market surveillance, enforcement
+      - name: Ministry of the Environment
+        abbrev: MOE
+        url: https://www.env.go.jp
+        scope: climate change, emissions reporting
+      - name: Nuclear Regulation Authority
+        abbrev: NRA
+        url: https://www.nra.go.jp
+        scope: nuclear safety regulation
+
+    emissions_source:
+      provider: MOE
+      dataset: Japan GHG Emissions Reporting System (SHK)
+      url: https://ghg-santeikohyo.env.go.jp
+      format: csv
+      frequency: annual
+
+    enforcement_source:
+      provider: EGC
+      dataset: EGC Orders and Recommendations
+      url: https://www.emsc.meti.go.jp/activity
+      format: html
+      frequency: as-published
+
+    market_notices:
+      provider: OCCTO
+      url: https://occtonet3.occto.or.jp/public
+      format: html
+      frequency: real-time
+
+    rules_corpus:
+      - Electricity Business Act
+      - Gas Business Act
+      - Act on Rationalizing Energy Use (Energy Conservation Act)
+      - Act on Promotion of Global Warming Countermeasures
+      - Feed-in Tariff (FIT) / Feed-in Premium (FIP) Act
+      - Act on Special Measures Concerning Nuclear Emergency Preparedness
+      - GX Promotion Act 2023
+
+    key_companies:
+      - name: Tokyo Electric Power Company (TEPCO)
+        ticker: TYO:9501
+        segment: generation, transmission, retail
+      - name: Kansai Electric Power Company
+        ticker: TYO:9503
+        segment: generation, transmission, retail
+      - name: Chubu Electric Power
+        ticker: TYO:9502
+        segment: generation, transmission, retail
+      - name: JERA Co.
+        parent: TEPCO/Chubu JV
+        segment: thermal generation, LNG
+      - name: Electric Power Development Co. (J-Power)
+        ticker: TYO:9513
+        segment: wholesale generation, hydro, wind
+
+    carbon_scheme:
+      name: GX League / GX ETS
+      authority: METI
+      type: voluntary phase (2023-25), mandatory ETS (2026+)
+      units: GX-ETS Allowances
+      target: 46% reduction by 2030 (vs 2013), net zero by 2050
+      legislation: GX Promotion Act 2023
+
+    notes: >
+      Japan has 10 regional utility areas, now unbundled into generation, transmission,
+      and retail. JEPX is the wholesale electricity exchange. Nuclear restarts post-Fukushima
+      remain a key policy issue under NRA oversight.
+
+  # ── 5. INDIA ─────────────────────────────────────────────────────────────
+  india:
+    display_name: India
+    iso_code: IN
+    timezone: Asia/Kolkata
+    currency: INR
+
+    regulators:
+      - name: Central Electricity Regulatory Commission
+        abbrev: CERC
+        url: https://cercind.gov.in
+        scope: interstate electricity tariffs, grid code, market rules
+      - name: Bureau of Energy Efficiency
+        abbrev: BEE
+        url: https://beeindia.gov.in
+        scope: energy efficiency standards, PAT scheme
+      - name: Ministry of New and Renewable Energy
+        abbrev: MNRE
+        url: https://mnre.gov.in
+        scope: renewable energy policy, RPO targets
+      - name: State Electricity Regulatory Commissions (28 SERCs)
+        abbrev: SERCs
+        scope: intrastate tariffs, distribution licensing, renewable purchase obligations
+
+    emissions_source:
+      provider: BEE
+      dataset: Perform Achieve and Trade (PAT) Scheme Data
+      url: https://beeindia.gov.in/en/pat-scheme
+      format: pdf
+      frequency: annual (PAT cycles)
+
+    enforcement_source:
+      provider: CERC
+      dataset: CERC Orders and Regulations
+      url: https://cercind.gov.in/orders.html
+      format: pdf
+      frequency: as-published
+
+    market_notices:
+      provider: Indian Energy Exchange (IEX)
+      url: https://www.iexindia.com/market-data
+      format: html
+      frequency: real-time
+
+    rules_corpus:
+      - Electricity Act 2003
+      - National Electricity Policy 2005
+      - National Tariff Policy 2016
+      - Energy Conservation Act 2001 (amended 2022)
+      - Renewable Purchase Obligation (RPO) Trajectory (2024-30)
+      - Indian Electricity Grid Code (IEGC)
+      - Carbon Credit Trading Scheme 2023
+
+    key_companies:
+      - name: Tata Power
+        ticker: BSE:500400
+        segment: generation, distribution, renewables
+      - name: Adani Green Energy / Adani Power
+        ticker: BSE:541450 / BSE:533096
+        segment: renewables, thermal generation
+      - name: ReNew Energy Global
+        ticker: NASDAQ:RNW
+        segment: wind, solar IPP
+      - name: NTPC Limited
+        ticker: BSE:532555
+        segment: thermal generation (largest genco)
+      - name: JSW Energy
+        ticker: BSE:533148
+        segment: generation, renewables
+
+    carbon_scheme:
+      name: Carbon Credit Trading Scheme (CCTS) / PAT Scheme
+      authority: BEE / Ministry of Power
+      type: baseline-and-credit (PAT), voluntary carbon market (CCTS)
+      units: Energy Savings Certificates (ESCerts), Carbon Credit Certificates
+      target: 45% emissions intensity reduction by 2030 (vs 2005), net zero by 2070
+      legislation: Energy Conservation (Amendment) Act 2022
+
+    notes: >
+      India has a complex federal structure with CERC handling central regulation and 28
+      SERCs for states. IEX and PXIL are the two power exchanges. The Perform Achieve and
+      Trade (PAT) scheme covers ~1,000 designated consumers across 13 sectors.
+
+  # ── 6. SOUTH KOREA ───────────────────────────────────────────────────────
+  south_korea:
+    display_name: South Korea
+    iso_code: KR
+    timezone: Asia/Seoul
+    currency: KRW
+
+    regulators:
+      - name: Ministry of Trade, Industry and Energy
+        abbrev: MOTIE
+        url: https://www.motie.go.kr
+        scope: energy policy, electricity business licensing
+      - name: Korea Energy Agency
+        abbrev: KEA
+        url: https://www.energy.or.kr
+        scope: energy efficiency, ETS MRV support
+      - name: Korea Exchange (Emissions Trading)
+        abbrev: KRX
+        url: https://ets.krx.co.kr
+        scope: K-ETS allowance trading platform
+      - name: Ministry of Environment
+        abbrev: MOE_KR
+        url: https://www.me.go.kr
+        scope: climate policy, K-ETS administration, GHG reporting
+
+    emissions_source:
+      provider: MOE_KR
+      dataset: GHG Inventory & Research Center of Korea (GIR)
+      url: https://www.gir.go.kr
+      format: xlsx
+      frequency: annual
+
+    enforcement_source:
+      provider: MOE_KR
+      dataset: K-ETS Compliance and Penalty Actions
+      url: https://ets.krx.co.kr
+      format: html
+      frequency: annual
+
+    market_notices:
+      provider: Korea Power Exchange (KPX)
+      url: https://www.kpx.or.kr
+      format: html
+      frequency: real-time
+
+    rules_corpus:
+      - Electricity Business Act
+      - Framework Act on Carbon Neutrality (2021)
+      - Act on Allocation and Trading of GHG Emission Permits
+      - Energy Act
+      - Renewable Energy Portfolio Standards (RPS)
+      - Korea Emissions Trading Scheme Allocation Plan (Phase 3)
+
+    key_companies:
+      - name: Korea Electric Power Corporation (KEPCO)
+        ticker: KRX:015760
+        segment: transmission, distribution, retail (monopoly)
+      - name: Korea Hydro & Nuclear Power (KHNP)
+        parent: KEPCO subsidiary
+        segment: nuclear and hydro generation
+      - name: Korea South-East Power (KOSEP)
+        parent: KEPCO subsidiary
+        segment: thermal and renewable generation
+      - name: Korea Midland Power (KOMIPO)
+        parent: KEPCO subsidiary
+        segment: thermal and renewable generation
+      - name: Korea Western Power (KOWEPO)
+        parent: KEPCO subsidiary
+        segment: thermal and renewable generation
+
+    carbon_scheme:
+      name: Korea Emissions Trading Scheme (K-ETS)
+      authority: MOE_KR
+      type: cap-and-trade
+      units: Korean Allowance Units (KAU), Korean Credit Units (KCU)
+      target: 40% reduction by 2030 (vs 2018), carbon neutrality by 2050
+      legislation: Act on Allocation and Trading of GHG Emission Permits
+
+    notes: >
+      Korea's electricity sector is dominated by KEPCO and its six generation subsidiaries.
+      K-ETS is the largest national ETS in Asia, covering ~70% of national emissions.
+      KPX operates the cost-based wholesale pool (CBP) market.
+
+  # ── 7. THAILAND ──────────────────────────────────────────────────────────
+  thailand:
+    display_name: Thailand
+    iso_code: TH
+    timezone: Asia/Bangkok
+    currency: THB
+
+    regulators:
+      - name: Energy Regulatory Commission
+        abbrev: ERC_TH
+        url: https://www.erc.or.th
+        scope: electricity and gas licensing, tariff regulation
+      - name: Energy Policy and Planning Office
+        abbrev: EPPO
+        url: https://www.eppo.go.th
+        scope: energy policy, power development plan
+      - name: Thailand Greenhouse Gas Management Organisation
+        abbrev: TGO
+        url: https://www.tgo.or.th
+        scope: GHG reporting, carbon credit certification
+      - name: Electricity Generating Authority of Thailand
+        abbrev: EGAT
+        url: https://www.egat.co.th
+        scope: system operator, bulk generation, transmission
+
+    emissions_source:
+      provider: TGO
+      dataset: Thailand Carbon Footprint and GHG Reporting
+      url: https://www.tgo.or.th/2020/index.php/en
+      format: pdf
+      frequency: annual
+
+    enforcement_source:
+      provider: ERC_TH
+      dataset: ERC Regulatory Orders
+      url: https://www.erc.or.th/en/regulations
+      format: pdf
+      frequency: as-published
+
+    market_notices:
+      provider: EGAT
+      url: https://www.egat.co.th/home/en/power-situation
+      format: html
+      frequency: daily
+
+    rules_corpus:
+      - Energy Industry Act B.E. 2550 (2007)
+      - Power Development Plan (PDP 2024)
+      - Energy Conservation Promotion Act B.E. 2535
+      - Thailand Climate Change Act (draft, expected 2025-26)
+      - Alternative Energy Development Plan (AEDP 2024)
+      - Thailand Voluntary Emission Reduction Program (T-VER)
+
+    key_companies:
+      - name: Electricity Generating Authority of Thailand (EGAT)
+        segment: state-owned, bulk generation, transmission
+      - name: RATCH Group
+        ticker: SET:RATCH
+        segment: generation, regional IPP
+      - name: Gulf Energy Development
+        ticker: SET:GULF
+        segment: gas-fired generation, renewables
+      - name: B.Grimm Power
+        ticker: SET:BGRIM
+        segment: industrial power, solar
+      - name: Global Power Synergy (GPSC)
+        parent: PTT Group
+        ticker: SET:GPSC
+        segment: generation, renewables
+
+    carbon_scheme:
+      name: Thailand Voluntary Emission Reduction Program (T-VER)
+      authority: TGO
+      type: voluntary crediting mechanism
+      units: Thailand Voluntary Emission Reduction (T-VER) Credits
+      target: 30-40% GHG reduction by 2030 (vs BAU), carbon neutrality by 2050
+      legislation: T-VER Programme Standards (TGO administered)
+
+    notes: >
+      Thailand uses an Enhanced Single Buyer (ESB) model where EGAT is the sole
+      off-taker of wholesale electricity. The PDP 2024 shifts toward renewables and
+      LNG. A mandatory ETS/carbon tax is under consideration.
+
+  # ── 8. PHILIPPINES ───────────────────────────────────────────────────────
+  philippines:
+    display_name: Philippines
+    iso_code: PH
+    timezone: Asia/Manila
+    currency: PHP
+
+    regulators:
+      - name: Energy Regulatory Commission
+        abbrev: ERC_PH
+        url: https://www.erc.gov.ph
+        scope: electricity rate regulation, licensing
+      - name: Department of Energy
+        abbrev: DOE
+        url: https://www.doe.gov.ph
+        scope: energy policy, power development plan
+      - name: Independent Electricity Market Operator of the Philippines
+        abbrev: IEMOP
+        url: https://www.iemop.ph
+        scope: wholesale electricity spot market operation
+      - name: Department of Environment and Natural Resources
+        abbrev: DENR
+        url: https://www.denr.gov.ph
+        scope: environmental compliance, emissions standards
+
+    emissions_source:
+      provider: DENR
+      dataset: Philippine GHG Inventory
+      url: https://www.denr.gov.ph/programs-and-projects/climate-change
+      format: pdf
+      frequency: biennial (national inventory)
+
+    enforcement_source:
+      provider: ERC_PH
+      dataset: ERC Decisions and Resolutions
+      url: https://www.erc.gov.ph/Issuances
+      format: pdf
+      frequency: as-published
+
+    market_notices:
+      provider: IEMOP
+      url: https://www.iemop.ph/market-data
+      format: csv
+      frequency: real-time
+
+    rules_corpus:
+      - Electric Power Industry Reform Act (EPIRA) R.A. 9136
+      - Renewable Energy Act R.A. 9513
+      - Philippine Energy Plan 2023-2050
+      - Clean Air Act R.A. 8749
+      - Green Energy Option Program (GEOP) Rules
+      - Competitive Selection Process (CSP) Guidelines
+      - Philippine Renewable Portfolio Standards (RPS) Rules
+
+    key_companies:
+      - name: Manila Electric Company (Meralco)
+        ticker: PSE:MER
+        segment: distribution (largest), retail
+      - name: Aboitiz Power
+        ticker: PSE:AP
+        segment: generation, distribution
+      - name: San Miguel Global Power
+        parent: San Miguel Corporation
+        segment: generation (largest genco)
+      - name: First Gen Corporation
+        ticker: PSE:FGEN
+        segment: gas-fired generation, renewables
+      - name: ACEN Corporation
+        ticker: PSE:ACEN
+        segment: renewables (largest RE platform in SEA)
+
+    carbon_scheme:
+      name: Philippine Carbon Market (under development)
+      authority: DENR / Climate Change Commission
+      type: planned domestic carbon market
+      units: to be determined
+      target: 75% GHG reduction by 2030 (2.71% unconditional, 72.29% conditional)
+      legislation: Philippine NDC under Paris Agreement; proposed Carbon Pricing Bill
+
+    notes: >
+      The Philippines operates the Wholesale Electricity Spot Market (WESM) via IEMOP
+      across Luzon and Visayas grids. Mindanao integration is ongoing. EPIRA mandates
+      open access and retail competition, though full implementation remains gradual.

@@ -23,18 +23,43 @@ from server.routes import router
 app.include_router(router)
 
 # Serve React frontend from built assets
-frontend_dist = Path(__file__).parent / "frontend" / "dist"
-if frontend_dist.exists():
+# Try multiple possible paths for the frontend dist directory
+_candidates = [
+    Path(__file__).parent / "frontend" / "dist",
+    Path(os.getcwd()) / "frontend" / "dist",
+    Path("/app/frontend/dist"),
+]
+frontend_dist = None
+for _c in _candidates:
+    if (_c / "index.html").exists():
+        frontend_dist = _c
+        logging.getLogger(__name__).info(f"Frontend found at {_c}")
+        break
+
+if frontend_dist:
     assets_dir = frontend_dist / "assets"
     if assets_dir.exists():
         app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
+    @app.get("/health")
+    async def health():
+        return {"status": "ok"}
+
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
-        # Don't serve SPA for API routes
         if full_path.startswith("api/"):
             return
         file_path = frontend_dist / full_path
         if file_path.is_file():
             return FileResponse(str(file_path))
         return FileResponse(str(frontend_dist / "index.html"))
+else:
+    logging.getLogger(__name__).warning("Frontend dist not found — serving API only")
+
+    @app.get("/health")
+    async def health():
+        return {"status": "ok", "frontend": False}
+
+    @app.get("/")
+    async def root():
+        return {"message": "Energy Compliance Intelligence Hub API", "docs": "/docs"}
