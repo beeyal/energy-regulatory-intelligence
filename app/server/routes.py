@@ -252,64 +252,96 @@ def obligations(
 
 @router.get("/compliance-gaps")
 def compliance_gaps(market: str = Query("AU")):
-    """Compliance gaps derived from enforcement + obligations data."""
+    """Cross-referenced compliance insights for the selected market."""
     df_enf = store.get_store().get("enforcement_actions", pd.DataFrame())
     df_obl = store.get_store().get("regulatory_obligations", pd.DataFrame())
+    df_emi = store.get_store().get("emissions_data", pd.DataFrame())
+    df_not = store.get_store().get("market_notices", pd.DataFrame())
 
+    def mdf(df):
+        if df.empty or "market" not in df.columns:
+            return pd.DataFrame()
+        return df[df["market"] == market].copy()
+
+    enf, obl, emi, not_ = mdf(df_enf), mdf(df_obl), mdf(df_emi), mdf(df_not)
     insights = []
 
-    if not df_enf.empty and "market" in df_enf.columns:
-        mdf = df_enf[df_enf["market"] == market]
-        # Repeat offenders
-        counts = mdf["company_name"].value_counts()
-        for company, cnt in counts[counts >= 2].items():
-            total_pen = pd.to_numeric(mdf[mdf["company_name"] == company]["penalty_aud"], errors="coerce").sum()
+    # ── 1. repeat_offender — top enforcement targets by total penalty ─────────
+    if not enf.empty:
+        enf["penalty_aud"] = pd.to_numeric(enf["penalty_aud"], errors="coerce").fillna(0)
+        pen_by_co = enf.groupby("company_name")["penalty_aud"].agg(["sum", "count"]).reset_index()
+        pen_by_co.columns = ["company_name", "total_penalty", "action_count"]
+        pen_by_co = pen_by_co.sort_values("total_penalty", ascending=False).head(6)
+        for _, row in pen_by_co.iterrows():
+            cnt = int(row["action_count"])
+            total = float(row["total_penalty"])
             insights.append({
                 "insight_type": "repeat_offender",
-                "entity_name": company,
-                "detail": f"{cnt} enforcement actions, total penalties AUD {total_pen:,.0f}",
-                "metric_value": float(total_pen),
+                "entity_name": row["company_name"],
+                "detail": f"{cnt} enforcement action{'s' if cnt != 1 else ''} — total penalties AUD {total:,.0f}",
+                "metric_value": total,
                 "period": "2019–2024",
-                "severity": "Critical" if cnt >= 3 else "Warning",
+                "severity": "Critical" if cnt >= 2 or total >= 1_000_000 else "Warning",
             })
 
-        # High-value penalties
-        penalties = pd.to_numeric(mdf["penalty_aud"], errors="coerce")
-        threshold = float(penalties.quantile(0.85)) if not penalties.empty else 0
-        high_pen = mdf[penalties > threshold].head(5)
-        for _, row in high_pen.iterrows():
+    # ── 2. high_emitter — top scope-1 emitters ───────────────────────────────
+    if not emi.empty:
+        emi["scope1_emissions_tco2e"] = pd.to_numeric(emi["scope1_emissions_tco2e"], errors="coerce").fillna(0)
+        top_emi = (
+            emi.groupby("corporation_name", as_index=False)
+            .agg(total_scope1=("scope1_emissions_tco2e", "sum"))
+            .nlargest(6, "total_scope1")
+        )
+        for _, row in top_emi.iterrows():
+            val = float(row["total_scope1"])
             insights.append({
-                "insight_type": "high_penalty",
+                "insight_type": "high_emitter",
+                "entity_name": row["corporation_name"],
+                "detail": f"Scope 1: {val:,.0f} tCO₂-e (2023-24)",
+                "metric_value": val,
+                "period": "2023-24",
+                "severity": "Critical" if val >= 5_000_000 else "Warning" if val >= 1_000_000 else "Info",
+            })
+
+    # ── 3. enforcement_trend — highest single penalties ───────────────────────
+    if not enf.empty:
+        top_pen = enf.nlargest(6, "penalty_aud")
+        for _, row in top_pen.iterrows():
+            val = float(pd.to_numeric(row.get("penalty_aud", 0), errors="coerce") or 0)
+            if val == 0:
+                continue
+            insights.append({
+                "insight_type": "enforcement_trend",
                 "entity_name": row.get("company_name", ""),
-                "detail": row.get("breach_description", "")[:120],
-                "metric_value": float(pd.to_numeric(row.get("penalty_aud", 0), errors="coerce") or 0),
-                "period": str(row.get("action_date", "")),
-                "severity": "Critical",
+                "detail": (row.get("breach_description") or row.get("breach_type") or "")[:120],
+                "metric_value": val,
+                "period": str(row.get("action_date", ""))[:10],
+                "severity": "Critical" if val >= 1_000_000 else "Warning",
             })
 
-    if not df_obl.empty and "market" in df_obl.columns:
-        mobl = df_obl[df_obl["market"] == market]
-        # Critical obligations with highest exposure
-        critical = mobl[mobl["risk_rating"] == "Critical"].nlargest(5, "penalty_max_aud")
-        for _, row in critical.iterrows():
+    # ── 4. notice_spike — critical/high-risk obligations as watch items ───────
+    if not obl.empty:
+        obl["penalty_max_aud"] = pd.to_numeric(obl["penalty_max_aud"], errors="coerce").fillna(0)
+        watch = obl[obl["risk_rating"].isin(["Critical", "High"])].nlargest(6, "penalty_max_aud")
+        for _, row in watch.iterrows():
+            val = float(row["penalty_max_aud"])
             insights.append({
-                "insight_type": "critical_obligation",
+                "insight_type": "notice_spike",
                 "entity_name": row.get("regulatory_body", ""),
-                "detail": row.get("obligation_name", ""),
-                "metric_value": float(pd.to_numeric(row.get("penalty_max_aud", 0), errors="coerce") or 0),
+                "detail": f"{row.get('obligation_name', '')} — {row.get('frequency', '')}",
+                "metric_value": val,
                 "period": "Current",
-                "severity": "Critical",
+                "severity": row.get("risk_rating", "Warning"),
             })
 
     insights.sort(key=lambda x: (
-        0 if x["severity"] == "Critical" else 1,
+        {"Critical": 0, "Warning": 1}.get(x["severity"], 2),
         -x["metric_value"],
     ))
 
     grouped: dict = {}
     for row in insights:
-        t = row.get("insight_type", "other")
-        grouped.setdefault(t, []).append(row)
+        grouped.setdefault(row["insight_type"], []).append(row)
 
     return {"insights": insights, "grouped": grouped}
 
