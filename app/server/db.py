@@ -36,7 +36,7 @@ def execute_query(sql: str) -> list[dict]:
     response = w.statement_execution.execute_statement(
         warehouse_id=warehouse_id,
         statement=sql,
-        wait_timeout="50s",
+        wait_timeout="50s",  # max allowed by API is 50s
     )
 
     if response.status and response.status.state:
