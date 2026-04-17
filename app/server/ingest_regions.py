@@ -69,7 +69,7 @@ def sg_emissions() -> pd.DataFrame:
             "net_energy_consumed_gj": round(base_s1 * 0.015 * rng.uniform(0.9, 1.1)),
             "electricity_production_mwh": round(base_s1 * 0.0004) if fuel != "Solar" else round(base_s1 * 2),
             "primary_fuel_source": fuel,
-            "reporting_year": "2023-24",
+            "reporting_year": "2024-25",
         })
     return pd.DataFrame(rows)
 
@@ -101,8 +101,8 @@ def sg_market_notices() -> pd.DataFrame:
             "market": "SG",
             "notice_id": f"SG-MN-{2024000 + i}",
             "notice_type": rng.choice(types),
-            "creation_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2025, 3, 31)), datetime.min.time()),
-            "issue_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2025, 3, 31)), datetime.min.time()),
+            "creation_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2026, 4, 1)), datetime.min.time()),
+            "issue_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2026, 4, 1)), datetime.min.time()),
             "region": rng.choice(regions),
             "reason": rng.choice(reasons),
             "external_reference": f"EMA-{rng.randint(1000,9999)}/{2024 + rng.randint(0,1)}",
@@ -132,7 +132,7 @@ def sg_enforcement() -> pd.DataFrame:
             "market": "SG",
             "action_id": _uid("SG-ENF"),
             "company_name": company,
-            "action_date": _rand_date(date(2020, 1, 1), date(2025, 3, 31)),
+            "action_date": _rand_date(date(2020, 1, 1), date(2026, 4, 1)),
             "action_type": atype,
             "breach_type": breach,
             "breach_description": desc,
@@ -213,7 +213,7 @@ def nz_emissions() -> pd.DataFrame:
             "net_energy_consumed_gj": round(base_s1 * 0.018 * rng.uniform(0.9, 1.1)),
             "electricity_production_mwh": round(base_s1 * 0.0003),
             "primary_fuel_source": fuel,
-            "reporting_year": "2023-24",
+            "reporting_year": "2024-25",
         })
     return pd.DataFrame(rows)
 
@@ -245,8 +245,8 @@ def nz_market_notices() -> pd.DataFrame:
             "market": "NZ",
             "notice_id": f"NZ-MN-{2024000 + i}",
             "notice_type": rng.choice(types),
-            "creation_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2025, 3, 31)), datetime.min.time()),
-            "issue_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2025, 3, 31)), datetime.min.time()),
+            "creation_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2026, 4, 1)), datetime.min.time()),
+            "issue_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2026, 4, 1)), datetime.min.time()),
             "region": rng.choice(regions),
             "reason": rng.choice(reasons),
             "external_reference": f"EA-{rng.randint(1000,9999)}/{2024 + rng.randint(0,1)}",
@@ -274,7 +274,7 @@ def nz_enforcement() -> pd.DataFrame:
             "market": "NZ",
             "action_id": _uid("NZ-ENF"),
             "company_name": company,
-            "action_date": _rand_date(date(2019, 1, 1), date(2025, 3, 31)),
+            "action_date": _rand_date(date(2019, 1, 1), date(2026, 4, 1)),
             "action_type": atype,
             "breach_type": breach,
             "breach_description": desc,
@@ -350,7 +350,7 @@ def jp_emissions() -> pd.DataFrame:
             "net_energy_consumed_gj": round(base_s1 * 0.012 * rng.uniform(0.9, 1.1)),
             "electricity_production_mwh": round(base_s1 * 0.00025),
             "primary_fuel_source": fuel,
-            "reporting_year": "2023-24",
+            "reporting_year": "2024-25",
         })
     return pd.DataFrame(rows)
 
@@ -382,8 +382,8 @@ def jp_market_notices() -> pd.DataFrame:
             "market": "JP",
             "notice_id": f"JP-MN-{2024000 + i}",
             "notice_type": rng.choice(types),
-            "creation_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2025, 3, 31)), datetime.min.time()),
-            "issue_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2025, 3, 31)), datetime.min.time()),
+            "creation_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2026, 4, 1)), datetime.min.time()),
+            "issue_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2026, 4, 1)), datetime.min.time()),
             "region": rng.choice(regions),
             "reason": rng.choice(reasons),
             "external_reference": f"OCCTO-{rng.randint(1000,9999)}-{2024 + rng.randint(0,1)}",
@@ -411,7 +411,7 @@ def jp_enforcement() -> pd.DataFrame:
             "market": "JP",
             "action_id": _uid("JP-ENF"),
             "company_name": company,
-            "action_date": _rand_date(date(2019, 1, 1), date(2025, 3, 31)),
+            "action_date": _rand_date(date(2019, 1, 1), date(2026, 4, 1)),
             "action_type": atype,
             "breach_type": breach,
             "breach_description": desc,
@@ -487,7 +487,7 @@ def in_emissions() -> pd.DataFrame:
             "net_energy_consumed_gj": round(base_s1 * 0.014 * rng.uniform(0.9, 1.1)),
             "electricity_production_mwh": round(base_s1 * 0.00028),
             "primary_fuel_source": fuel,
-            "reporting_year": "2023-24",
+            "reporting_year": "2024-25",
         })
     return pd.DataFrame(rows)
 
@@ -519,8 +519,8 @@ def in_market_notices() -> pd.DataFrame:
             "market": "IN",
             "notice_id": f"IN-MN-{2024000 + i}",
             "notice_type": rng.choice(types),
-            "creation_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2025, 3, 31)), datetime.min.time()),
-            "issue_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2025, 3, 31)), datetime.min.time()),
+            "creation_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2026, 4, 1)), datetime.min.time()),
+            "issue_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2026, 4, 1)), datetime.min.time()),
             "region": rng.choice(regions),
             "reason": rng.choice(reasons),
             "external_reference": f"CERC-{rng.randint(1000,9999)}/{2024 + rng.randint(0,1)}",
@@ -548,7 +548,7 @@ def in_enforcement() -> pd.DataFrame:
             "market": "IN",
             "action_id": _uid("IN-ENF"),
             "company_name": company,
-            "action_date": _rand_date(date(2019, 1, 1), date(2025, 3, 31)),
+            "action_date": _rand_date(date(2019, 1, 1), date(2026, 4, 1)),
             "action_type": atype,
             "breach_type": breach,
             "breach_description": desc,
@@ -624,7 +624,7 @@ def kr_emissions() -> pd.DataFrame:
             "net_energy_consumed_gj": round(base_s1 * 0.013 * rng.uniform(0.9, 1.1)),
             "electricity_production_mwh": round(base_s1 * 0.00022),
             "primary_fuel_source": fuel,
-            "reporting_year": "2023-24",
+            "reporting_year": "2024-25",
         })
     return pd.DataFrame(rows)
 
@@ -656,8 +656,8 @@ def kr_market_notices() -> pd.DataFrame:
             "market": "KR",
             "notice_id": f"KR-MN-{2024000 + i}",
             "notice_type": rng.choice(types),
-            "creation_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2025, 3, 31)), datetime.min.time()),
-            "issue_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2025, 3, 31)), datetime.min.time()),
+            "creation_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2026, 4, 1)), datetime.min.time()),
+            "issue_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2026, 4, 1)), datetime.min.time()),
             "region": rng.choice(regions),
             "reason": rng.choice(reasons),
             "external_reference": f"KPX-{rng.randint(1000,9999)}-{2024 + rng.randint(0,1)}",
@@ -685,7 +685,7 @@ def kr_enforcement() -> pd.DataFrame:
             "market": "KR",
             "action_id": _uid("KR-ENF"),
             "company_name": company,
-            "action_date": _rand_date(date(2019, 1, 1), date(2025, 3, 31)),
+            "action_date": _rand_date(date(2019, 1, 1), date(2026, 4, 1)),
             "action_type": atype,
             "breach_type": breach,
             "breach_description": desc,
@@ -761,7 +761,7 @@ def th_emissions() -> pd.DataFrame:
             "net_energy_consumed_gj": round(base_s1 * 0.016 * rng.uniform(0.9, 1.1)),
             "electricity_production_mwh": round(base_s1 * 0.00030),
             "primary_fuel_source": fuel,
-            "reporting_year": "2023-24",
+            "reporting_year": "2024-25",
         })
     return pd.DataFrame(rows)
 
@@ -793,8 +793,8 @@ def th_market_notices() -> pd.DataFrame:
             "market": "TH",
             "notice_id": f"TH-MN-{2024000 + i}",
             "notice_type": rng.choice(types),
-            "creation_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2025, 3, 31)), datetime.min.time()),
-            "issue_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2025, 3, 31)), datetime.min.time()),
+            "creation_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2026, 4, 1)), datetime.min.time()),
+            "issue_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2026, 4, 1)), datetime.min.time()),
             "region": rng.choice(regions),
             "reason": rng.choice(reasons),
             "external_reference": f"ERC-{rng.randint(1000,9999)}/{2024 + rng.randint(0,1)}",
@@ -822,7 +822,7 @@ def th_enforcement() -> pd.DataFrame:
             "market": "TH",
             "action_id": _uid("TH-ENF"),
             "company_name": company,
-            "action_date": _rand_date(date(2019, 1, 1), date(2025, 3, 31)),
+            "action_date": _rand_date(date(2019, 1, 1), date(2026, 4, 1)),
             "action_type": atype,
             "breach_type": breach,
             "breach_description": desc,
@@ -898,7 +898,7 @@ def ph_emissions() -> pd.DataFrame:
             "net_energy_consumed_gj": round(base_s1 * 0.017 * rng.uniform(0.9, 1.1)),
             "electricity_production_mwh": round(base_s1 * 0.00032),
             "primary_fuel_source": fuel,
-            "reporting_year": "2023-24",
+            "reporting_year": "2024-25",
         })
     return pd.DataFrame(rows)
 
@@ -930,8 +930,8 @@ def ph_market_notices() -> pd.DataFrame:
             "market": "PH",
             "notice_id": f"PH-MN-{2024000 + i}",
             "notice_type": rng.choice(types),
-            "creation_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2025, 3, 31)), datetime.min.time()),
-            "issue_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2025, 3, 31)), datetime.min.time()),
+            "creation_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2026, 4, 1)), datetime.min.time()),
+            "issue_date": datetime.combine(_rand_date(date(2024, 1, 1), date(2026, 4, 1)), datetime.min.time()),
             "region": rng.choice(regions),
             "reason": rng.choice(reasons),
             "external_reference": f"ERC-{rng.randint(1000,9999)}/{2024 + rng.randint(0,1)}",
@@ -959,7 +959,7 @@ def ph_enforcement() -> pd.DataFrame:
             "market": "PH",
             "action_id": _uid("PH-ENF"),
             "company_name": company,
-            "action_date": _rand_date(date(2019, 1, 1), date(2025, 3, 31)),
+            "action_date": _rand_date(date(2019, 1, 1), date(2026, 4, 1)),
             "action_type": atype,
             "breach_type": breach,
             "breach_description": desc,
