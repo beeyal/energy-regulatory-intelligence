@@ -35,6 +35,7 @@ interface DisclosureData {
     scope3_tco2e: number;
     total_tco2e: number;
   }[];
+  aasb_s2_note?: string;
 }
 
 function formatNum(n: number): string {
@@ -72,6 +73,12 @@ function SectionBlock({ title, data }: { title: string; data: Record<string, str
     </div>
   );
 }
+
+const STANDARDS = [
+  { id: "ASX", label: "🇦🇺 ASX ASRS 1/2" },
+  { id: "AASB_S2", label: "🇦🇺 AASB S2" },
+  { id: "SGX", label: "🇸🇬 SGX TCFD" },
+];
 
 export default function ESGDisclosure() {
   const { market } = useRegion();
@@ -113,14 +120,14 @@ export default function ESGDisclosure() {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          {["ASX", "SGX"].map((s) => (
+        <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+          {STANDARDS.map((s) => (
             <button
-              key={s}
-              className={`filter-btn ${standard === s ? "active" : ""}`}
-              onClick={() => setStandard(s)}
+              key={s.id}
+              className={`filter-btn ${standard === s.id ? "active" : ""}`}
+              onClick={() => setStandard(s.id)}
             >
-              {s === "ASX" ? "🇦🇺 ASX ASRS 1/2" : "🇸🇬 SGX TCFD"}
+              {s.label}
             </button>
           ))}
         </div>
@@ -250,10 +257,55 @@ export default function ESGDisclosure() {
             background: "rgba(79,143,247,0.06)", borderRadius: 8,
             fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6,
           }}>
-            <strong>Disclosure note:</strong> Scope 1 = direct combustion and process emissions.
-            Scope 2 = purchased electricity and heat (market-based method).
-            Scope 3 = material upstream and downstream value chain emissions (Category 1 & 11).
-            All figures in metric tonnes CO2 equivalent (t CO2-e). Reporting period: {data.reporting_period}.
+            {data.aasb_s2_note ? (
+              <><strong>AASB S2 note:</strong> {data.aasb_s2_note}</>
+            ) : (
+              <><strong>Disclosure note:</strong> Scope 1 = direct combustion and process emissions.
+              Scope 2 = purchased electricity and heat (market-based method).
+              Scope 3 = material upstream and downstream value chain emissions (Category 1 &amp; 11).
+              All figures in metric tonnes CO2 equivalent (t CO2-e). Reporting period: {data.reporting_period}.</>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* AASB S2 extra metrics card */}
+      {standard === "AASB_S2" && data?.sections?.metrics_and_targets && (
+        <div className="card">
+          <div className="card-header">
+            <h2>AASB S2 Additional Metrics</h2>
+            <span className="badge" style={{ background: "rgba(16,185,129,0.15)", color: "#10b981", fontSize: 10 }}>
+              Mandatory from 1 Jan 2025
+            </span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+            {(["safeguard_baseline_tco2e", "headroom_vs_safeguard_tco2e", "internal_carbon_price_aud", "climate_related_financial_impact_aud"] as const).map((key) => {
+              const val = (data.sections.metrics_and_targets as Record<string, string | number>)[key];
+              if (val === undefined) return null;
+              const labels: Record<string, string> = {
+                safeguard_baseline_tco2e: "Safeguard Baseline",
+                headroom_vs_safeguard_tco2e: "Headroom vs Baseline",
+                internal_carbon_price_aud: "Internal Carbon Price",
+                climate_related_financial_impact_aud: "Est. Carbon Cost",
+              };
+              const isHeadroom = key === "headroom_vs_safeguard_tco2e";
+              const headroomVal = typeof val === "number" ? val : null;
+              return (
+                <div key={key} className="stat-card">
+                  <div className="label">{labels[key]}</div>
+                  <div className="value" style={{
+                    color: isHeadroom
+                      ? (headroomVal !== null && headroomVal < 0 ? "var(--accent-red)" : "#10b981")
+                      : "var(--accent-blue)",
+                    fontSize: 14,
+                  }}>
+                    {typeof val === "number" ? val.toLocaleString() : val}
+                    {key === "internal_carbon_price_aud" ? " AUD/tCO2-e" : ""}
+                    {key === "safeguard_baseline_tco2e" || key === "headroom_vs_safeguard_tco2e" ? " t CO2-e" : ""}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

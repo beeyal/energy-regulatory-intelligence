@@ -32,7 +32,23 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<NotificationData | null>(null);
   const [dismissed, setDismissed] = useState<Set<number>>(new Set());
+  const [teamsSending, setTeamsSending] = useState(false);
+  const [teamsStatus, setTeamsStatus] = useState<"idle" | "sent" | "skipped" | "error">("idle");
   const panelRef = useRef<HTMLDivElement>(null);
+
+  async function sendToTeams() {
+    setTeamsSending(true);
+    try {
+      const res = await fetch(`/api/alerts/send-teams?market=${market}`, { method: "POST" });
+      const json = await res.json();
+      setTeamsStatus(json.status === "sent" ? "sent" : json.status === "skipped" ? "skipped" : "error");
+    } catch {
+      setTeamsStatus("error");
+    } finally {
+      setTeamsSending(false);
+      setTimeout(() => setTeamsStatus("idle"), 4000);
+    }
+  }
 
   useEffect(() => {
     fetch(`/api/notifications?market=${market}`)
@@ -102,14 +118,32 @@ export default function NotificationBell() {
             display: "flex", justifyContent: "space-between", alignItems: "center",
           }}>
             <span style={{ fontSize: 14, fontWeight: 700 }}>Alerts ({unread})</span>
-            {unread > 0 && (
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <button
-                onClick={() => setDismissed(new Set(alerts.map((_, i) => i)))}
-                style={{ fontSize: 11, color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
+                onClick={sendToTeams}
+                disabled={teamsSending}
+                title="Send alerts to Microsoft Teams"
+                style={{
+                  fontSize: 10, fontWeight: 600,
+                  padding: "2px 7px", borderRadius: 4,
+                  border: "1px solid rgba(79,143,247,0.3)",
+                  background: teamsStatus === "sent" ? "rgba(16,185,129,0.15)" : "rgba(79,143,247,0.08)",
+                  color: teamsStatus === "sent" ? "#10b981" : teamsStatus === "error" ? "#ef4444" : "var(--accent-blue)",
+                  cursor: teamsSending ? "not-allowed" : "pointer",
+                  whiteSpace: "nowrap",
+                }}
               >
-                Dismiss all
+                {teamsSending ? "…" : teamsStatus === "sent" ? "✓ Sent" : teamsStatus === "skipped" ? "⚠ Not configured" : teamsStatus === "error" ? "✕ Error" : "📣 Teams"}
               </button>
-            )}
+              {unread > 0 && (
+                <button
+                  onClick={() => setDismissed(new Set(alerts.map((_, i) => i)))}
+                  style={{ fontSize: 11, color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer" }}
+                >
+                  Dismiss all
+                </button>
+              )}
+            </div>
           </div>
 
           {visible.length === 0 ? (

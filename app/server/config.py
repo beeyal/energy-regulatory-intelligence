@@ -55,3 +55,37 @@ def get_fqn(table: str) -> str:
 def get_model_endpoint() -> str:
     """Get the Foundation Model API endpoint name for chat."""
     return os.environ.get("LLM_ENDPOINT", "databricks-meta-llama-3-3-70b-instruct")
+
+
+def get_vs_endpoint() -> str:
+    """Get the Vector Search endpoint name.
+
+    Returns an empty string when Vector Search is not configured, which causes
+    the VS query helpers in llm.py to skip VS and fall back to pandas queries.
+    """
+    return os.environ.get("VS_ENDPOINT", "")
+
+
+def get_vs_obligations_index() -> str:
+    """Fully-qualified name of the regulatory_obligations VS index.
+
+    Example: my_catalog.compliance.obligations_vs_index
+    """
+    return os.environ.get("VS_OBLIGATIONS_INDEX", "")
+
+
+def get_vs_enforcement_index() -> str:
+    """Fully-qualified name of the enforcement_actions VS index.
+
+    Example: my_catalog.compliance.enforcement_vs_index
+    """
+    return os.environ.get("VS_ENFORCEMENT_INDEX", "")
+
+
+def get_teams_webhook_url() -> str:
+    """Microsoft Teams incoming webhook URL for critical alert notifications.
+
+    Set TEAMS_WEBHOOK_URL in the environment to enable Teams notifications.
+    Returns empty string when not configured (Teams integration disabled).
+    """
+    return os.environ.get("TEAMS_WEBHOOK_URL", "")

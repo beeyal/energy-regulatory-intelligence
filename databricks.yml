@@ -9,6 +9,7 @@ bundle:
 
 include:
   - resources/*.yml
+  - pipelines/pipeline_config.yml
 
 variables:
   catalog:
@@ -23,6 +24,19 @@ variables:
   serving_endpoint:
     description: Model serving endpoint for LLM-powered compliance analysis
     default: databricks-meta-llama-3-3-70b-instruct
+  # Pipeline variables (forwarded to pipelines/pipeline_config.yml)
+  compliance_catalog:
+    description: Unity Catalog target for DLT pipeline tables (defaults to catalog)
+    default: main
+  compliance_schema:
+    description: Schema for DLT pipeline tables (defaults to schema)
+    default: compliance
+  pipeline_dev_mode:
+    description: Run DLT pipeline in development mode
+    default: "false"
+  pipeline_alert_email:
+    description: Email for DLT pipeline failure alerts
+    default: "sourabh.ghose@databricks.com"
 
 workspace:
   root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
@@ -68,16 +82,26 @@ targets:
     default: true
     variables:
       catalog: dev_compliance
+      compliance_catalog: dev_compliance
+      compliance_schema: compliance
       warehouse_size: 2X-Small
+      pipeline_dev_mode: "true"
     resources:
       jobs:
         setup_compliance_tables:
           # Dev: run on-demand only, no schedule
           schedule: null
+      pipelines:
+        compliance_data_refresh:
+          # Dev: disable scheduled trigger; run manually
+          trigger: null
+          development: true
 
   staging:
     variables:
       catalog: staging_compliance
+      compliance_catalog: staging_compliance
+      compliance_schema: compliance
       warehouse_size: X-Small
     resources:
       jobs:
@@ -85,12 +109,21 @@ targets:
           schedule:
             quartz_cron_expression: "0 0 6 * * ?"
             timezone_id: Australia/Sydney
+      pipelines:
+        compliance_data_refresh:
+          trigger:
+            cron:
+              quartz_cron_expression: "0 0 3 * * ?"
+              timezone_id: "UTC"
 
   prod:
     mode: production
     variables:
-      catalog: prod_compliance
+      catalog: ausnet_groupops_catalog
+      compliance_catalog: ausnet_groupops_catalog
+      compliance_schema: compliance
       warehouse_size: Small
       serving_endpoint: databricks-meta-llama-3-3-70b-instruct
+      pipeline_alert_email: "sourabh.ghose@databricks.com"
     run_as:
       service_principal_name: energy-compliance-hub-sp

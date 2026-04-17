@@ -1,0 +1,91 @@
+# Energy Compliance Hub — Lakeflow Spark Declarative Pipeline definition
+# -------------------------------------------------------------------------
+# Deploy with:
+#   databricks bundle deploy --target dev
+#   databricks bundle deploy --target prod
+#
+# Run manually:
+#   databricks bundle run compliance_data_refresh
+#
+# This file is the Databricks Asset Bundle pipeline resource definition.
+# The top-level databricks.yml (in the project root) must include it via:
+#
+#   include:
+#     - pipelines/pipeline_config.yml
+#
+# Environment-specific overrides (catalog, schema, schedule) are handled
+# via the `targets` block in databricks.yml.
+# -------------------------------------------------------------------------
+
+resources:
+  pipelines:
+    compliance_data_refresh:
+      name: "Energy Compliance Hub — Data Refresh"
+
+      # ── Source pipeline file ─────────────────────────────────────────────
+      libraries:
+        - file:
+            path: ./compliance_pipeline.py
+
+      # ── Unity Catalog target (all bronze/silver/gold tables land here) ───
+      catalog: ${var.compliance_catalog}
+      target:  ${var.compliance_schema}
+
+      # ── Serverless compute (default; no cluster block needed) ────────────
+      serverless: true
+
+      # ── Pipeline-level parameters (read via spark.conf.get in Python) ────
+      configuration:
+        # Where source/landing tables live (read by the pipeline to build FQNs)
+        source_catalog: ${var.compliance_catalog}
+        source_schema:  ${var.compliance_schema}
+        # Default market tag applied when a record has no market column
+        default_market: "AU"
+
+      # ── Data quality: warn (don't fail the pipeline) ─────────────────────
+      development: ${var.pipeline_dev_mode}
+
+      # ── Triggered schedule (UTC) — daily at 02:00 ───────────────────────
+      trigger:
+        cron:
+          quartz_cron_expression: "0 0 2 * * ?"
+          timezone_id: "UTC"
+
+      # ── Notifications ────────────────────────────────────────────────────
+      notifications:
+        - email_recipients:
+            - ${var.pipeline_alert_email}
+          alerts:
+            - on_update_failure
+            - on_flow_failure
+
+      # ── Continuous / triggered mode ──────────────────────────────────────
+      # Bronze streaming tables use TRIGGERED (not CONTINUOUS) so that each
+      # pipeline run ingests a bounded micro-batch from the source tables and
+      # completes cleanly. Set continuous: true for near-real-time ingestion.
+      continuous: false
+
+      # ── Permissions ──────────────────────────────────────────────────────
+      permissions:
+        - group_name: compliance_readers
+          level: CAN_VIEW
+        - group_name: compliance_engineers
+          level: CAN_MANAGE
+
+# ── Bundle variables (override per target in databricks.yml) ─────────────────
+variables:
+  compliance_catalog:
+    description: "Unity Catalog target for all compliance tables"
+    default: main
+
+  compliance_schema:
+    description: "Schema (database) for compliance tables"
+    default: compliance
+
+  pipeline_dev_mode:
+    description: "Run pipeline in development mode (resets state on each run)"
+    default: "false"
+
+  pipeline_alert_email:
+    description: "Email address for pipeline failure alerts"
+    default: "data-engineering@example.com"

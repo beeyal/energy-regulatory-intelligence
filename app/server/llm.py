@@ -10,7 +10,13 @@ from typing import Generator
 import mlflow
 from openai import OpenAI
 
-from .config import get_model_endpoint, get_workspace_client
+from .config import (
+    get_model_endpoint,
+    get_vs_endpoint,
+    get_vs_obligations_index,
+    get_vs_enforcement_index,
+    get_workspace_client,
+)
 from .region import RegionConfig, build_system_prompt, get_region
 from . import in_memory_data as mem
 
@@ -133,7 +139,89 @@ def classify_intent(message: str, market: str = "AU") -> str:
     return "summary"
 
 
-# ── Context builder (in-memory) ──────────────────────────────────────────────
+# ── Vector Search query helper ────────────────────────────────────────────────
+
+def _query_vector_search(
+    query: str,
+    market: str,
+    index_name: str,
+    num_results: int = 5,
+) -> list[dict]:
+    """Query a Databricks Vector Search index for semantically similar records.
+
+    Falls back gracefully and returns an empty list when:
+      - VS_ENDPOINT or the index name env var is not set
+      - The endpoint / index is unavailable (e.g. local dev, VS not provisioned)
+      - Any unexpected SDK or network error occurs
+
+    Parameters
+    ----------
+    query       : Natural-language query string (embedded by the VS service).
+    market      : Market code used as a filter so results are market-scoped.
+    index_name  : Fully-qualified index name, e.g. catalog.schema.obligations_vs_index.
+    num_results : Number of nearest neighbours to retrieve.
+
+    Returns
+    -------
+    List of row dicts extracted from the VS result set.  Each dict contains the
+    column names returned by the index.  The similarity score column (last in
+    the data_array) is excluded from the returned dicts.
+    """
+    if not get_vs_endpoint() or not index_name:
+        logger.debug("Vector Search not configured — skipping VS query.")
+        return []
+
+    try:
+        w = get_workspace_client()
+        results = w.vector_search_indexes.query_index(
+            index_name=index_name,
+            columns=None,          # return all indexed columns
+            query_text=query,
+            num_results=num_results,
+            filters_json=f'{{"market": "{_sanitize(market)}"}}',
+        )
+
+        if not results or not results.result or not results.result.data_array:
+            return []
+
+        # The manifest tells us the column ordering; the last column is the
+        # similarity score injected by VS — we drop it from the returned dicts.
+        manifest = results.manifest
+        if manifest and manifest.columns:
+            col_names = [c.name for c in manifest.columns]
+            # Drop the trailing score column (VS appends it automatically)
+            data_cols = col_names[:-1] if col_names else []
+        else:
+            data_cols = []
+
+        rows = []
+        for data_row in results.result.data_array:
+            if data_cols:
+                row = {
+                    col: data_row[i]
+                    for i, col in enumerate(data_cols)
+                    if i < len(data_row)
+                }
+            else:
+                # Manifest unavailable — return raw list wrapped in a dict
+                row = {"_raw": data_row[:-1]}
+            rows.append(row)
+
+        logger.info(
+            f"VS query returned {len(rows)} results from '{index_name}' "
+            f"(market={market})."
+        )
+        return rows
+
+    except Exception as exc:
+        logger.warning(
+            f"Vector Search query failed for index '{index_name}': {exc}. "
+            "Falling back to in-memory pandas query."
+        )
+        return []
+
+
+# ── Context builder (in-memory + Vector Search) ───────────────────────────────
 
 def _build_context(intent: str, message: str, market: str = "AU") -> tuple[str, list]:
     """Build context rows from the in-memory store, market-filtered."""
@@ -173,28 +261,59 @@ def _build_context(intent: str, message: str, market: str = "AU") -> tuple[str, 
                         r[k] = str(r[k])
 
         elif intent == "enforcement":
-            filters = {}
-            for company in known_companies:
-                if company in msg_lower:
-                    filters["company_name"] = f"%{company}%"
-                    break
-            rows = mem.query("enforcement_actions", market=market, filters=filters,
-                             sort_by="penalty_aud", limit=20)
+            # Try Vector Search first for semantic retrieval; fall back to pandas.
+            rows = _query_vector_search(
+                query=message,
+                market=market,
+                index_name=get_vs_enforcement_index(),
+                num_results=15,
+            )
+            if not rows:
+                logger.debug("VS returned no enforcement results — using pandas fallback.")
+                filters: dict = {}
+                for company in known_companies:
+                    if company in msg_lower:
+                        filters["company_name"] = f"%{company}%"
+                        break
+                rows = mem.query(
+                    "enforcement_actions",
+                    market=market,
+                    filters=filters,
+                    sort_by="penalty_aud",
+                    limit=20,
+                )
             for r in rows:
                 if r.get("action_date") and not isinstance(r["action_date"], str):
                     r["action_date"] = str(r["action_date"])
 
         elif intent == "obligations":
-            filters = {}
-            for reg in region.regulators:
-                if reg.code.lower() in msg_lower:
-                    filters["regulatory_body"] = reg.code
-                    break
-            cat_match = re.search(r"\b(market|safety|environment|technical|financial|consumer|network)\b", msg_lower)
-            if cat_match:
-                filters["category"] = f"%{cat_match.group(1)}%"
-            rows = mem.query("regulatory_obligations", market=market, filters=filters,
-                             sort_by="penalty_max_aud", limit=20)
+            # Try Vector Search first for semantic retrieval; fall back to pandas.
+            rows = _query_vector_search(
+                query=message,
+                market=market,
+                index_name=get_vs_obligations_index(),
+                num_results=15,
+            )
+            if not rows:
+                logger.debug("VS returned no obligations results — using pandas fallback.")
+                filters = {}
+                for reg in region.regulators:
+                    if reg.code.lower() in msg_lower:
+                        filters["regulatory_body"] = reg.code
+                        break
+                cat_match = re.search(
+                    r"\b(market|safety|environment|technical|financial|consumer|network)\b",
+                    msg_lower,
+                )
+                if cat_match:
+                    filters["category"] = f"%{cat_match.group(1)}%"
+                rows = mem.query(
+                    "regulatory_obligations",
+                    market=market,
+                    filters=filters,
+                    sort_by="penalty_max_aud",
+                    limit=20,
+                )
 
         elif intent == "company_profile":
             company = next((c for c in known_companies if c in msg_lower), None)
