@@ -1,8 +1,9 @@
 """
 In-memory data store for the Energy Compliance Intelligence Hub.
 
-Loads all market data on first access and caches it for the lifetime of the process.
-This makes the app self-contained — no Unity Catalog or SQL warehouse required.
+On startup, tries to load data from Unity Catalog (when COMPLIANCE_CATALOG is
+configured). Falls back to bundled CSVs + synthetic generators if UC is
+unavailable, so the app works offline and in local development.
 
 Data layout:
     _store = {
@@ -158,11 +159,84 @@ def _load_au_notices() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+# ── UC loader ────────────────────────────────────────────────────────────────
+
+# Type coercions to apply after loading each table from UC
+_UC_COERCIONS: dict[str, dict[str, str]] = {
+    "enforcement_actions": {
+        "penalty_aud": "float",
+        "action_date": "date",
+    },
+    "regulatory_obligations": {
+        "penalty_max_aud": "float",
+    },
+    "emissions_data": {
+        "scope1_emissions_tco2e": "float",
+        "scope2_emissions_tco2e": "float",
+        "net_energy_consumed_gj": "float",
+        "electricity_production_mwh": "float",
+    },
+    "market_notices": {
+        "creation_date": "datetime",
+        "issue_date": "datetime",
+    },
+}
+
+
+def _load_from_uc() -> dict[str, pd.DataFrame]:
+    """Load all four data tables from Unity Catalog.
+
+    Returns a dict of DataFrames keyed by table name.
+    Raises RuntimeError if any table is inaccessible or empty.
+    """
+    from .config import get_fqn
+    from . import db
+
+    result: dict[str, pd.DataFrame] = {}
+    for table, coercions in _UC_COERCIONS.items():
+        fqn = get_fqn(table)
+        logger.info(f"  Loading {fqn}…")
+        rows = db.execute_query(f"SELECT * FROM {fqn}")
+        if not rows:
+            raise RuntimeError(f"UC table {fqn} returned no rows — cannot use UC data")
+        df = pd.DataFrame(rows)
+        for col, kind in coercions.items():
+            if col not in df.columns:
+                continue
+            if kind == "float":
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+            elif kind == "date":
+                df[col] = pd.to_datetime(df[col], errors="coerce").dt.date
+            elif kind == "datetime":
+                df[col] = pd.to_datetime(df[col], errors="coerce")
+        result[table] = df
+        logger.info(f"    {table}: {len(df)} rows, markets={sorted(df['market'].unique()) if 'market' in df.columns else '?'}")
+
+    return result
+
+
 # ── Loader ────────────────────────────────────────────────────────────────────
 
 def _load_all() -> None:
     global _store, _loaded
-    logger.info("Initialising in-memory data store…")
+    logger.info("Initialising data store…")
+
+    from .config import get_catalog, get_schema
+
+    # ── Try Unity Catalog first ──────────────────────────────────────────────
+    catalog = get_catalog()
+    if catalog != "main":
+        logger.info(f"UC configured ({catalog}.{get_schema()}) — attempting UC load…")
+        try:
+            _store = _load_from_uc()
+            _loaded = True
+            logger.info(f"Data store ready (source: Unity Catalog {catalog}.{get_schema()})")
+            return
+        except Exception as e:
+            logger.warning(f"UC load failed: {e} — falling back to synthetic data")
+
+    # ── Fallback: CSV seed + synthetic generators ────────────────────────────
+    logger.info("Loading synthetic / seed data…")
 
     try:
         from .ingest_regions import get_all_region_data
@@ -171,13 +245,11 @@ def _load_all() -> None:
         logger.warning(f"Region data generation failed: {e}")
         region_data = {}
 
-    # AU tables
-    au_emissions = _load_au_emissions()
-    au_notices = _load_au_notices()
+    au_emissions  = _load_au_emissions()
+    au_notices    = _load_au_notices()
     au_enforcement = _load_au_enforcement()
     au_obligations = _load_au_obligations()
 
-    # Non-AU tables — flatten each market's DataFrames into combined tables
     non_au_emissions, non_au_notices, non_au_enforcement, non_au_obligations = [], [], [], []
     for dfs in region_data.values():
         non_au_emissions.append(dfs["emissions"])
@@ -190,17 +262,17 @@ def _load_all() -> None:
         return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
 
     _store = {
-        "emissions_data":           combine(au_emissions, *non_au_emissions),
-        "market_notices":           combine(au_notices, *non_au_notices),
-        "enforcement_actions":      combine(au_enforcement, *non_au_enforcement),
-        "regulatory_obligations":   combine(au_obligations, *non_au_obligations),
+        "emissions_data":         combine(au_emissions, *non_au_emissions),
+        "market_notices":         combine(au_notices, *non_au_notices),
+        "enforcement_actions":    combine(au_enforcement, *non_au_enforcement),
+        "regulatory_obligations": combine(au_obligations, *non_au_obligations),
     }
 
     for name, df in _store.items():
         logger.info(f"  {name}: {len(df)} rows, {df['market'].nunique() if 'market' in df.columns else 0} markets")
 
     _loaded = True
-    logger.info("In-memory data store ready")
+    logger.info("Data store ready (source: synthetic)")
 
 
 def _ensure_loaded() -> None:
