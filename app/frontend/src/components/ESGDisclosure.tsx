@@ -280,7 +280,7 @@ export default function ESGDisclosure() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
             {(["safeguard_baseline_tco2e", "headroom_vs_safeguard_tco2e", "internal_carbon_price_aud", "climate_related_financial_impact_aud"] as const).map((key) => {
-              const val = (data.sections.metrics_and_targets as Record<string, string | number>)[key];
+              const val = (data.sections.metrics_and_targets as unknown as Record<string, string | number>)[key];
               if (val === undefined) return null;
               const labels: Record<string, string> = {
                 safeguard_baseline_tco2e: "Safeguard Baseline",
