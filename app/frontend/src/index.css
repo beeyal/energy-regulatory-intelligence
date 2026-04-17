@@ -3,9 +3,13 @@
 /*  2026 Dark Theme: Glassmorphism + Gradient Accents + Micro-Motion  */
 /* ================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
 
 :root {
+  /* Typography */
+  --font-display: "Syne", system-ui, sans-serif;
+  --font-body: "DM Sans", system-ui, sans-serif;
+
   /* Core palette */
   --bg-primary: #0a0c13;
   --bg-secondary: #111420;
@@ -15,30 +19,34 @@
   --bg-glass: rgba(18, 22, 36, 0.6);
   --border: rgba(255, 255, 255, 0.06);
   --border-accent: rgba(255, 255, 255, 0.1);
-  --border-glow: rgba(79, 143, 247, 0.3);
+  --border-glow: rgba(13, 148, 136, 0.35);
+
+  /* Token aliases for newer components */
+  --surface: #161a28;
+  --bg: rgba(18, 22, 36, 0.6);
 
   /* Text */
   --text-primary: #f0f2f7;
   --text-secondary: #8b92a8;
   --text-muted: #565e75;
 
-  /* Accent colours */
-  --accent-blue: #4f8ff7;
-  --accent-blue-bright: #6ba3ff;
+  /* Accent colours — teal brand, severity unchanged */
+  --accent-blue: #0d9488;
+  --accent-blue-bright: #2dd4bf;
   --accent-green: #34d399;
   --accent-amber: #fbbf24;
   --accent-red: #f87171;
   --accent-purple: #a78bfa;
   --accent-cyan: #22d3ee;
 
-  /* Gradients */
-  --gradient-blue: linear-gradient(135deg, #4f8ff7, #6366f1);
+  /* Gradients — teal-to-emerald brand */
+  --gradient-blue: linear-gradient(135deg, #0d9488, #059669);
   --gradient-green: linear-gradient(135deg, #34d399, #06b6d4);
   --gradient-amber: linear-gradient(135deg, #fbbf24, #f59e0b);
   --gradient-red: linear-gradient(135deg, #f87171, #ef4444);
   --gradient-purple: linear-gradient(135deg, #a78bfa, #8b5cf6);
-  --gradient-header: linear-gradient(90deg, #4f8ff7 0%, #6366f1 100%);
-  --gradient-card-border: linear-gradient(135deg, rgba(79,143,247,0.2), rgba(99,102,241,0.05), rgba(167,139,250,0.1));
+  --gradient-header: linear-gradient(90deg, #0d9488 0%, #059669 100%);
+  --gradient-card-border: linear-gradient(135deg, rgba(13,148,136,0.2), rgba(5,150,105,0.05), rgba(52,211,153,0.1));
 
   /* Severity */
   --severity-critical: #f87171;
@@ -54,7 +62,7 @@
   --shadow-sm: 0 2px 8px rgba(0,0,0,0.2);
   --shadow-md: 0 4px 20px rgba(0,0,0,0.3);
   --shadow-lg: 0 8px 40px rgba(0,0,0,0.4);
-  --shadow-glow-blue: 0 0 20px rgba(79,143,247,0.15);
+  --shadow-glow-blue: 0 0 20px rgba(13,148,136,0.18);
   --shadow-glow-red: 0 0 20px rgba(248,113,113,0.15);
   --shadow-glow-green: 0 0 20px rgba(52,211,153,0.15);
   --shadow-glow-amber: 0 0 20px rgba(251,191,36,0.15);
@@ -73,7 +81,7 @@
   --bg-glass: rgba(255, 255, 255, 0.7);
   --border: rgba(0, 0, 0, 0.08);
   --border-accent: rgba(0, 0, 0, 0.12);
-  --border-glow: rgba(79, 143, 247, 0.25);
+  --border-glow: rgba(13, 148, 136, 0.25);
 
   --text-primary: #0f1623;
   --text-secondary: #4a5272;
@@ -82,7 +90,7 @@
   --shadow-sm: 0 2px 8px rgba(0,0,0,0.07);
   --shadow-md: 0 4px 20px rgba(0,0,0,0.1);
   --shadow-lg: 0 8px 40px rgba(0,0,0,0.14);
-  --shadow-glow-blue: 0 0 20px rgba(79,143,247,0.12);
+  --shadow-glow-blue: 0 0 20px rgba(13,148,136,0.12);
   --shadow-glow-red: 0 0 20px rgba(239,68,68,0.1);
   --shadow-glow-green: 0 0 20px rgba(52,211,153,0.1);
   --shadow-glow-amber: 0 0 20px rgba(245,158,11,0.1);
@@ -90,8 +98,8 @@
 
 [data-theme="light"] body {
   background-image:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(79,143,247,0.05), transparent),
-    radial-gradient(ellipse 60% 40% at 80% 60%, rgba(99,102,241,0.03), transparent);
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(13,148,136,0.05), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 60%, rgba(5,150,105,0.03), transparent);
 }
 
 [data-theme="light"] .app-header {
@@ -99,7 +107,7 @@
 }
 
 [data-theme="light"] .stat-pill.emissions  { background: rgba(239, 68, 68, 0.08);  border-color: rgba(239, 68, 68, 0.2);  }
-[data-theme="light"] .stat-pill.notices    { background: rgba(79,143,247, 0.08);   border-color: rgba(79,143,247, 0.2);   }
+[data-theme="light"] .stat-pill.notices    { background: rgba(13,148,136, 0.08);   border-color: rgba(13,148,136, 0.2);   }
 [data-theme="light"] .stat-pill.enforcement{ background: rgba(245,158, 11, 0.1);   border-color: rgba(245,158, 11, 0.22); }
 [data-theme="light"] .stat-pill.obligations{ background: rgba(16,185,129, 0.08);   border-color: rgba(16,185,129, 0.2);   }
 
@@ -147,14 +155,14 @@
 }
 
 body {
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
   background: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.6;
   min-height: 100vh;
   background-image:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(79,143,247,0.08), transparent),
-    radial-gradient(ellipse 60% 40% at 80% 60%, rgba(99,102,241,0.04), transparent);
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(13,148,136,0.07), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 60%, rgba(5,150,105,0.04), transparent);
 }
 
 #root { min-height: 100vh; }
@@ -221,9 +229,10 @@ body {
 }
 
 .app-header h1 {
+  font-family: var(--font-display);
   font-size: 21px;
   font-weight: 800;
-  letter-spacing: -0.6px;
+  letter-spacing: -0.4px;
   line-height: 1.2;
   background: var(--gradient-header);
   -webkit-background-clip: text;
@@ -397,9 +406,9 @@ body {
   border: none;
   color: var(--text-muted);
   padding: 12px 18px;
-  font-family: inherit;
+  font-family: var(--font-display);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   border-bottom: 2px solid transparent;
   transition: all 0.2s ease;
@@ -475,8 +484,9 @@ body {
 }
 
 .card-header h2 {
+  font-family: var(--font-display);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.2px;
 }
 
@@ -982,11 +992,11 @@ body {
 .chart-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 16px;
 }
 .chart-card-header { margin-bottom: 12px; }
-.chart-card-header h3 { font-size: 13px; font-weight: 600; color: var(--text-primary); margin: 0 0 2px; }
+.chart-card-header h3 { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--text-primary); margin: 0 0 2px; }
 .chart-subtitle { font-size: 11px; color: var(--text-muted); }
 .chart-card-skeleton { animation: chart-pulse 1.5s ease-in-out infinite; }
 .skeleton-line { background: var(--border); border-radius: 4px; }
@@ -1057,7 +1067,7 @@ body {
 .loading-spinner {
   width: 16px; height: 16px;
   border: 2px solid var(--border);
-  border-top-color: #3B82F6;
+  border-top-color: var(--accent-blue);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   flex-shrink: 0;
@@ -1068,7 +1078,7 @@ body {
 .typing-cursor {
   display: inline-block;
   animation: blink 1s step-end infinite;
-  color: #3B82F6;
+  color: var(--accent-blue);
   font-weight: 300;
 }
 @keyframes blink { 50% { opacity: 0; } }
@@ -1083,7 +1093,7 @@ body {
   font-size: 13px;
   padding: 6px 14px;
 }
-.btn-secondary:hover { border-color: #3B82F6; color: #3B82F6; }
+.btn-secondary:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
 .modal-footer {
   padding: 10px 20px;
   border-top: 1px solid var(--border);
@@ -1238,12 +1248,12 @@ body {
 .briefing-logo-line { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 18px; }
 .briefing-logo-mark { width: 10px; height: 10px; background: var(--gradient-blue); border-radius: 3px; display: inline-block; }
 .briefing-company { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; }
-.briefing-title { font-size: 26px; font-weight: 800; color: var(--text-primary); margin-bottom: 10px; letter-spacing: -0.5px; }
+.briefing-title { font-family: var(--font-display); font-size: 26px; font-weight: 800; color: var(--text-primary); margin-bottom: 10px; letter-spacing: -0.5px; }
 .briefing-meta { display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 12px; color: var(--text-muted); }
 .briefing-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--border-accent); }
 
 .briefing-section { margin-bottom: 32px; }
-.briefing-section-title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 18px; display: flex; align-items: center; gap: 12px; }
+.briefing-section-title { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 18px; display: flex; align-items: center; gap: 12px; }
 .briefing-section-num { width: 28px; height: 28px; background: var(--gradient-blue); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
 .briefing-paragraph { font-size: 13px; color: var(--text-secondary); line-height: 1.8; margin-bottom: 10px; }
 
