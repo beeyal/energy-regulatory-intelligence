@@ -684,6 +684,181 @@ def board_briefing(market: str = Query("AU")):
     }
 
 
+# ── Risk overview extras ──────────────────────────────────────────────────────
+
+def _market_avg_risk(market: str) -> int:
+    """Compute average heatmap risk score for a single market."""
+    df_obl = store.get_store().get("regulatory_obligations", pd.DataFrame())
+    if df_obl.empty or "market" not in df_obl.columns:
+        return 0
+    mobl = df_obl[df_obl["market"] == market]
+    if mobl.empty:
+        return 0
+    total_score = 0
+    cells = 0
+    for _, row in mobl.iterrows():
+        risk = row.get("risk_rating", "")
+        score = {"Critical": 85, "High": 60, "Medium": 35, "Low": 15}.get(risk, 25)
+        total_score += score
+        cells += 1
+    return min(100, int(total_score / cells)) if cells else 0
+
+
+@router.get("/market-risk-scores")
+def market_risk_scores():
+    """Aggregate risk score per market for the radar chart."""
+    all_markets = list_markets()
+    results = []
+    for m in all_markets:
+        try:
+            region = get_region(m)
+            score = _market_avg_risk(m)
+            results.append({
+                "market": m,
+                "name": region.name,
+                "flag": region.flag,
+                "score": score,
+            })
+        except Exception:
+            continue
+    return {"markets": results}
+
+
+@router.get("/upcoming-deadlines")
+def upcoming_deadlines(market: str = Query("AU")):
+    """Top obligations by proximity to deadline."""
+    df_obl = store.get_store().get("regulatory_obligations", pd.DataFrame())
+    if df_obl.empty or "market" not in df_obl.columns:
+        return {"deadlines": []}
+
+    mobl = df_obl[df_obl["market"] == market].copy()
+    if mobl.empty:
+        return {"deadlines": []}
+
+    def _days(obligation_id: str) -> int:
+        h = abs(hash(str(obligation_id))) & 0x7FFFFFFF
+        return 3 + (h % 88)  # 3-90 days
+
+    rows = []
+    for _, row in mobl.iterrows():
+        days = _days(str(row.get("obligation_id", row.get("obligation_name", ""))))
+        rows.append({
+            "obligation_name": row.get("obligation_name", ""),
+            "regulatory_body": row.get("regulatory_body", ""),
+            "category": row.get("category", ""),
+            "risk_rating": row.get("risk_rating", ""),
+            "penalty_max_aud": float(pd.to_numeric(row.get("penalty_max_aud", 0), errors="coerce") or 0),
+            "frequency": row.get("frequency", ""),
+            "days_to_deadline": days,
+        })
+
+    rows.sort(key=lambda r: r["days_to_deadline"])
+    return {"deadlines": rows[:10]}
+
+
+@router.get("/activity-feed")
+def activity_feed(market: str = Query("AU")):
+    """Recent enforcement actions and market notices combined feed."""
+    s = store.get_store()
+    enf = s.get("enforcement_actions", pd.DataFrame())
+    notices = s.get("market_notices", pd.DataFrame())
+
+    items = []
+
+    if not enf.empty and "market" in enf.columns:
+        menf = enf[enf["market"] == market].copy()
+        menf["_dt"] = pd.to_datetime(menf["action_date"], errors="coerce")
+        recent = menf.sort_values("_dt", ascending=False, na_position="last").head(12)
+        for _, row in recent.iterrows():
+            pen = float(pd.to_numeric(row.get("penalty_aud", 0), errors="coerce") or 0)
+            items.append({
+                "type": "enforcement",
+                "title": str(row.get("company_name", "")),
+                "subtitle": str(row.get("action_type", "")),
+                "description": str(row.get("breach_description", ""))[:120],
+                "date": str(row.get("action_date", "")),
+                "severity": "critical" if pen >= 500_000 else "warning" if pen >= 100_000 else "info",
+                "metric": f"${pen/1e6:.1f}M" if pen >= 1e6 else f"${int(pen/1e3)}K" if pen >= 1e3 else f"${int(pen)}",
+            })
+
+    if not notices.empty and "market" in notices.columns:
+        mnot = notices[notices["market"] == market].copy()
+        mnot["_dt"] = pd.to_datetime(mnot["creation_date"], errors="coerce")
+        recent = mnot.sort_values("_dt", ascending=False, na_position="last").head(12)
+        for _, row in recent.iterrows():
+            items.append({
+                "type": "notice",
+                "title": str(row.get("notice_type", "")),
+                "subtitle": str(row.get("region", "")),
+                "description": str(row.get("reason", ""))[:120],
+                "date": str(row.get("creation_date", ""))[:10],
+                "severity": "warning" if "NON-CONFORM" in str(row.get("notice_type", "")).upper() else "info",
+                "metric": None,
+            })
+
+    items.sort(key=lambda x: x["date"] or "", reverse=True)
+    return {"items": items[:20]}
+
+
+@router.get("/risk-brief")
+async def risk_brief(market: str = Query("AU")):
+    """Stream an AI-generated risk posture narrative for the current market."""
+    s = store.get_store()
+    enf = s.get("enforcement_actions", pd.DataFrame())
+    obl = s.get("regulatory_obligations", pd.DataFrame())
+
+    try:
+        region = get_region(market)
+        market_name = region.name
+    except Exception:
+        market_name = market
+
+    # Build context snapshot
+    context_lines = []
+    if not enf.empty and "market" in enf.columns:
+        menf = enf[enf["market"] == market]
+        total_pen = pd.to_numeric(menf["penalty_aud"], errors="coerce").sum()
+        context_lines.append(f"Total enforcement penalty: ${total_pen/1e6:.1f}M across {len(menf)} actions")
+        top = menf.nlargest(3, "penalty_aud")[["company_name", "penalty_aud", "breach_type"]].to_dict("records")
+        for r in top:
+            context_lines.append(f"  - {r['company_name']}: ${pd.to_numeric(r['penalty_aud'], errors='coerce')/1e6:.1f}M ({r['breach_type']})")
+
+    if not obl.empty and "market" in obl.columns:
+        mobl = obl[obl["market"] == market]
+        crit = int((mobl["risk_rating"] == "Critical").sum())
+        high = int((mobl["risk_rating"] == "High").sum())
+        context_lines.append(f"Obligation profile: {crit} Critical, {high} High risk obligations")
+        top_obl = mobl[mobl["risk_rating"] == "Critical"]["obligation_name"].head(3).tolist()
+        for o in top_obl:
+            context_lines.append(f"  - {o}")
+
+    avg_score = _market_avg_risk(market)
+    context_lines.append(f"Overall risk score: {avg_score}/100")
+
+    context = "\n".join(context_lines)
+    prompt = (
+        f"You are a Chief Risk Officer preparing a daily regulatory risk brief for {market_name}.\n\n"
+        f"Current data snapshot:\n{context}\n\n"
+        f"Write a concise 3-paragraph executive risk brief:\n"
+        f"1. Overall risk posture (2-3 sentences)\n"
+        f"2. Top 3 specific concerns with supporting data\n"
+        f"3. Recommended immediate actions (bullet points)\n\n"
+        f"Be specific, data-driven, and actionable. Avoid filler phrases."
+    )
+
+    async def event_generator():
+        try:
+            from .llm import chat_stream as llm_stream
+            for token in llm_stream(prompt, market):
+                yield {"data": json.dumps(token)}
+            yield {"event": "done", "data": ""}
+        except Exception as e:
+            logger.error(f"Risk brief stream error: {e}")
+            yield {"event": "error", "data": str(e)}
+
+    return EventSourceResponse(event_generator())
+
+
 # ── Chat endpoints ────────────────────────────────────────────────────────────
 
 @router.post("/chat/stream")

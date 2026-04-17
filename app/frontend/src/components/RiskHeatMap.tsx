@@ -3,6 +3,10 @@ import { useApi } from "../hooks/useApi";
 import { LoadingCard, LoadingStats } from "./LoadingSkeleton";
 import BoardBriefing from "./BoardBriefing";
 import DashboardCharts from "./DashboardCharts";
+import MarketRadar from "./MarketRadar";
+import DeadlineTracker from "./DeadlineTracker";
+import ActivityFeed from "./ActivityFeed";
+import RiskBrief from "./RiskBrief";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -88,6 +92,7 @@ function formatCurrency(val: number): string {
 export default function RiskHeatMap() {
   const [selectedCell, setSelectedCell] = useState<HeatmapCell | null>(null);
   const [showBriefing, setShowBriefing] = useState(false);
+  const [showRiskBrief, setShowRiskBrief] = useState(false);
 
   const { data, loading, error } = useApi<ApiHeatmapResponse>("/api/risk-heatmap");
 
@@ -169,13 +174,24 @@ export default function RiskHeatMap() {
             <div className="value" style={{ color: riskColor(avgRisk) }}>{avgRisk}/100</div>
           </div>
         </div>
-        <button className="briefing-generate-btn" onClick={() => setShowBriefing(true)}>
-          Generate Board Briefing
-        </button>
+        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          <button className="briefing-generate-btn" style={{ background: "var(--gradient-purple, linear-gradient(135deg,#7C3AED,#5B21B6))" }} onClick={() => setShowRiskBrief(true)}>
+            AI Risk Brief
+          </button>
+          <button className="briefing-generate-btn" onClick={() => setShowBriefing(true)}>
+            Board Briefing
+          </button>
+        </div>
       </div>
 
       {/* Dashboard charts — penalty trend, risk distribution, breach types */}
       <DashboardCharts />
+
+      {/* Market radar + deadline tracker */}
+      <div className="radar-deadlines-row">
+        <MarketRadar />
+        <DeadlineTracker />
+      </div>
 
       {/* Heatmap card */}
       <div className="card">
@@ -301,7 +317,11 @@ export default function RiskHeatMap() {
         </div>
       )}
 
+      {/* Activity feed */}
+      <ActivityFeed />
+
       <BoardBriefing visible={showBriefing} onClose={() => setShowBriefing(false)} />
+      <RiskBrief visible={showRiskBrief} onClose={() => setShowRiskBrief(false)} />
     </div>
   );
 }

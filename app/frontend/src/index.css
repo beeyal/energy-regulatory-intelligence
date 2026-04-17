@@ -995,6 +995,82 @@ body {
 @media (max-width: 1100px) { .charts-row { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 700px)  { .charts-row { grid-template-columns: 1fr; } }
 
+/* ── Radar + Deadline row ─────────────────────────────────────────── */
+.radar-deadlines-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+@media (max-width: 800px) { .radar-deadlines-row { grid-template-columns: 1fr; } }
+
+/* ── Deadline tracker list ────────────────────────────────────────── */
+.deadline-list { display: flex; flex-direction: column; gap: 8px; }
+.deadline-item {
+  padding: 8px 10px 8px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.deadline-item-top { display: flex; align-items: flex-start; gap: 8px; }
+
+/* ── Activity feed ────────────────────────────────────────────────── */
+.activity-feed-scroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.activity-feed-item {
+  min-width: 200px;
+  max-width: 240px;
+  flex-shrink: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.activity-feed-item-header { display: flex; align-items: center; gap: 6px; }
+
+/* ── Loading spinner ──────────────────────────────────────────────── */
+.loading-spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: #3B82F6;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Typing cursor ────────────────────────────────────────────────── */
+.typing-cursor {
+  display: inline-block;
+  animation: blink 1s step-end infinite;
+  color: #3B82F6;
+  font-weight: 300;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ── Modal shared styles (btn-secondary, modal-footer) ───────────── */
+.btn-secondary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 6px 14px;
+}
+.btn-secondary:hover { border-color: #3B82F6; color: #3B82F6; }
+.modal-footer {
+  padding: 10px 20px;
+  border-top: 1px solid var(--border);
+  text-align: right;
+}
+
 .briefing-generate-btn {
   background: var(--gradient-blue);
   border: none;
