@@ -600,6 +600,88 @@ def emissions_forecast(market: str = Query("AU")):
     }
 
 
+@router.get("/board-briefing-narrative")
+async def board_briefing_narrative(market: str = Query("AU")):
+    """Stream an AI-generated board-quality executive narrative for the briefing pack."""
+    s = store.get_store()
+    enf = s.get("enforcement_actions", pd.DataFrame())
+    obl = s.get("regulatory_obligations", pd.DataFrame())
+    emi = s.get("emissions_data", pd.DataFrame())
+
+    try:
+        region = get_region(market)
+        market_name = region.name
+    except Exception:
+        market_name = market
+
+    lines = []
+
+    # Enforcement summary
+    if not enf.empty and "market" in enf.columns:
+        menf = enf[enf["market"] == market]
+        total_pen = pd.to_numeric(menf["penalty_aud"], errors="coerce").sum()
+        num_actions = len(menf)
+        num_companies = menf["company_name"].nunique() if not menf.empty else 0
+        lines.append(f"Enforcement: {num_actions} actions across {num_companies} companies; total penalties ${total_pen/1e6:.1f}M")
+        top_actions = menf.sort_values("penalty_aud", ascending=False, na_position="last").head(4)
+        for _, r in top_actions.iterrows():
+            pen = pd.to_numeric(r.get("penalty_aud", 0), errors="coerce") or 0
+            lines.append(f"  - {r.get('company_name')}: ${pen/1e6:.2f}M — {r.get('breach_description', '')[:90]}")
+
+    # Obligations profile
+    if not obl.empty and "market" in obl.columns:
+        mobl = obl[obl["market"] == market]
+        for rating in ["Critical", "High", "Medium"]:
+            cnt = int((mobl["risk_rating"] == rating).sum())
+            if cnt:
+                lines.append(f"Obligations — {rating}: {cnt}")
+        crit_names = mobl[mobl["risk_rating"] == "Critical"]["obligation_name"].head(3).tolist()
+        for n in crit_names:
+            lines.append(f"  - Critical: {n}")
+
+    # Emissions
+    if not emi.empty and "market" in emi.columns:
+        memi = emi[emi["market"] == market]
+        if not memi.empty:
+            total_s1 = pd.to_numeric(memi["scope1_emissions_tco2e"], errors="coerce").sum()
+            lines.append(f"Total Scope 1 emissions: {total_s1/1e6:.2f} Mt CO2-e")
+            top_emitter = memi.groupby("corporation_name")["scope1_emissions_tco2e"].sum().idxmax()
+            lines.append(f"  Largest emitter: {top_emitter}")
+
+    avg_score = _market_avg_risk(market)
+    lines.append(f"Composite risk score: {avg_score}/100")
+
+    context = "\n".join(lines)
+    prompt = (
+        f"You are a Chief Risk Officer preparing the executive narrative section of a formal Board "
+        f"Compliance Briefing Pack for {market_name}.\n\n"
+        f"Current regulatory data snapshot:\n{context}\n\n"
+        f"Write a professional, board-quality executive narrative of exactly 4 paragraphs:\n\n"
+        f"Paragraph 1 — Risk Posture Overview: Summarise the overall compliance risk posture, "
+        f"quantify the financial exposure, and characterise the severity trend.\n\n"
+        f"Paragraph 2 — Enforcement Activity: Describe the enforcement landscape this period. "
+        f"Reference the highest-exposure actions by company and amount. Identify patterns.\n\n"
+        f"Paragraph 3 — Obligations & Emissions: Address the critical and high-risk obligations "
+        f"requiring board attention and the emissions reporting exposure.\n\n"
+        f"Paragraph 4 — Strategic Outlook: Provide a forward-looking assessment, flag upcoming "
+        f"regulatory changes, and state what board decisions are required.\n\n"
+        f"Tone: formal, direct, data-driven. No bullet points — prose only. "
+        f"Reference specific numbers from the data. Avoid generic filler language."
+    )
+
+    async def event_generator():
+        try:
+            from .llm import chat_stream as llm_stream
+            for token in llm_stream(prompt, market):
+                yield {"data": json.dumps(token)}
+            yield {"event": "done", "data": ""}
+        except Exception as e:
+            logger.error(f"Board briefing narrative stream error: {e}")
+            yield {"event": "error", "data": str(e)}
+
+    return EventSourceResponse(event_generator())
+
+
 @router.get("/board-briefing")
 def board_briefing(market: str = Query("AU")):
     """Executive board briefing data pack."""
@@ -626,6 +708,7 @@ def board_briefing(market: str = Query("AU")):
         "total": float(penalties.sum()),
         "count": len(menf),
         "companies": int(menf["company_name"].nunique()) if not menf.empty else 0,
+        "max_penalty": float(penalties.max()) if not penalties.empty else 0,
     }
 
     # Recent enforcement

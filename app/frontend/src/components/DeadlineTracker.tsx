@@ -82,7 +82,8 @@ export default function DeadlineTracker() {
         )}
       </div>
 
-      <div className="deadline-list">
+      <div className="deadline-list-scroll">
+        <div className="deadline-list">
         {deadlines.map((d, i) => {
           const pct = Math.max(4, Math.round((1 - d.days_to_deadline / 90) * 100));
           return (
@@ -130,6 +131,7 @@ export default function DeadlineTracker() {
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );

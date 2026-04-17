@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import type { MarketInfo } from "../context/RegionContext";
+import MarkdownRenderer from "./MarkdownRenderer";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -7,6 +9,8 @@ import { useState, useEffect } from "react";
 interface BoardBriefingProps {
   visible: boolean;
   onClose: () => void;
+  market?: string;
+  activeMarket?: MarketInfo | null;
 }
 
 interface RiskDistribution {
@@ -91,13 +95,6 @@ function severityFromRating(rating: string): "critical" | "warning" | "info" {
   return "info";
 }
 
-function severityFromPenalty(penaltyStr: string): "critical" | "warning" | "info" {
-  const num = parseFloat(penaltyStr);
-  if (num >= 1_000_000) return "critical";
-  if (num >= 200_000) return "warning";
-  return "info";
-}
-
 const BRIEFING_DATE = new Date().toLocaleDateString("en-AU", {
   year: "numeric",
   month: "long",
@@ -108,35 +105,95 @@ const BRIEFING_DATE = new Date().toLocaleDateString("en-AU", {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function BoardBriefing({ visible, onClose }: BoardBriefingProps) {
+export default function BoardBriefing({ visible, onClose, market = "AU", activeMarket }: BoardBriefingProps) {
+  const marketName = activeMarket?.market_name ?? activeMarket?.name ?? market;
+  const marketFlag = activeMarket?.flag ?? "";
+  // Derive a plausible company display name from the market
+  const companyName = market === "AU"
+    ? "EnergyAus Holdings Ltd"
+    : `${marketName} Energy Holdings`;
+  const marketLabel = `${marketFlag} ${marketName}`.trim();
   const [copied, setCopied] = useState(false);
   const [data, setData] = useState<ApiBoardBriefingResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Streaming narrative state
+  const [narrative, setNarrative] = useState("");
+  const [narrativeLoading, setNarrativeLoading] = useState(false);
+  const [narrativeDone, setNarrativeDone] = useState(false);
+  const esRef = useRef<EventSource | null>(null);
+
+  // Fetch structured data
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
 
-    fetch("/api/board-briefing")
+    fetch(`/api/board-briefing?market=${market}`)
       .then((resp) => {
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         return resp.json();
       })
-      .then((json) => {
-        if (!cancelled) setData(json);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Unknown error");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      .then((json) => { if (!cancelled) setData(json); })
+      .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : "Unknown error"); })
+      .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
-  }, [visible]);
+  }, [visible, market]);
+
+  // Start streaming narrative
+  const startNarrative = () => {
+    if (esRef.current) {
+      esRef.current.close();
+      esRef.current = null;
+    }
+    setNarrative("");
+    setNarrativeLoading(true);
+    setNarrativeDone(false);
+
+    const es = new EventSource(`/api/board-briefing-narrative?market=${market}`);
+    esRef.current = es;
+
+    es.onmessage = (e) => {
+      try {
+        const token = JSON.parse(e.data);
+        setNarrative((prev) => prev + token);
+      } catch {
+        /* ignore parse errors */
+      }
+    };
+
+    es.addEventListener("done", () => {
+      setNarrativeLoading(false);
+      setNarrativeDone(true);
+      es.close();
+      esRef.current = null;
+    });
+
+    es.addEventListener("error", () => {
+      setNarrativeLoading(false);
+      es.close();
+      esRef.current = null;
+    });
+  };
+
+  // Auto-start narrative when modal opens
+  useEffect(() => {
+    if (visible) {
+      startNarrative();
+    } else {
+      // Clean up on close
+      if (esRef.current) {
+        esRef.current.close();
+        esRef.current = null;
+      }
+      setNarrative("");
+      setNarrativeLoading(false);
+      setNarrativeDone(false);
+    }
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!visible) return null;
 
@@ -171,11 +228,19 @@ export default function BoardBriefing({ visible, onClose }: BoardBriefingProps) 
         <div className="briefing-toolbar">
           <div className="briefing-toolbar-left">
             <span className="briefing-doc-icon">DOC</span>
-            <span className="briefing-toolbar-title">Board Compliance Briefing</span>
+            <span className="briefing-toolbar-title">Board Compliance Briefing — {marketLabel}</span>
           </div>
           <div className="briefing-toolbar-right">
+            <button
+              className="briefing-btn"
+              onClick={startNarrative}
+              disabled={narrativeLoading}
+              title="Regenerate AI narrative"
+            >
+              {narrativeLoading ? "Generating…" : "Regenerate"}
+            </button>
             <button className="briefing-btn" onClick={handleCopy}>
-              {copied ? "Copied" : "Copy to Clipboard"}
+              {copied ? "Copied" : "Copy"}
             </button>
             <button className="briefing-btn briefing-btn-close" onClick={onClose}>
               Close
@@ -213,10 +278,12 @@ export default function BoardBriefing({ visible, onClose }: BoardBriefingProps) 
               <div className="briefing-doc-header">
                 <div className="briefing-logo-line">
                   <span className="briefing-logo-mark" />
-                  <span className="briefing-company">EnergyAus Holdings Ltd</span>
+                  <span className="briefing-company">{companyName}</span>
                 </div>
                 <h1 className="briefing-title">Board Compliance Briefing</h1>
                 <div className="briefing-meta">
+                  <span>Market: {marketLabel}</span>
+                  <span className="dot" />
                   <span>Prepared: {BRIEFING_DATE}</span>
                   <span className="dot" />
                   <span>Classification: Board Confidential</span>
@@ -225,7 +292,7 @@ export default function BoardBriefing({ visible, onClose }: BoardBriefingProps) 
                 </div>
               </div>
 
-              {/* 1. Executive Summary */}
+              {/* 1. Executive Summary — Stats + AI Narrative */}
               <section className="briefing-section">
                 <h2 className="briefing-section-title">
                   <span className="briefing-section-num">1</span>
@@ -253,12 +320,37 @@ export default function BoardBriefing({ visible, onClose }: BoardBriefingProps) 
                     <div className="briefing-summary-detail">Target: 95%</div>
                   </div>
                 </div>
-                <p className="briefing-paragraph">
-                  The organisation's compliance risk posture has shifted from <strong>Moderate</strong> to <strong>Elevated</strong> this quarter, driven primarily by the convergence of new CER emissions reporting requirements (NGER amendments effective 1 July 2026) and recent AER enforcement activity targeting consumer protection obligations. The total financial exposure across all risk areas is estimated at <strong>{totalPenaltyExposure}</strong>, spanning <strong>{penaltyCount}</strong> enforcement actions across <strong>{penaltyCompanies}</strong> companies.
-                </p>
-                <p className="briefing-paragraph">
-                  {criticalCount} obligations are classified as critical, with the largest single penalty exposure reaching {maxPenalty}. Management has initiated remediation programs for all critical items, with progress tracked in the Compliance Management System.
-                </p>
+
+                {/* AI-generated narrative */}
+                <div className="briefing-narrative-block">
+                  <div className="briefing-narrative-label">
+                    <span className="briefing-ai-badge">AI</span>
+                    Board Executive Narrative
+                    {narrativeLoading && <span className="briefing-generating-pulse">Generating…</span>}
+                  </div>
+                  <div className="briefing-narrative-body">
+                    {narrative ? (
+                      <>
+                        <MarkdownRenderer content={narrative} />
+                        {narrativeLoading && <span className="typing-cursor" />}
+                      </>
+                    ) : narrativeLoading ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {Array.from({ length: 4 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="skeleton skeleton-row"
+                            style={{ width: `${75 + (i % 3) * 8}%` }}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="briefing-paragraph" style={{ color: "var(--text-muted)" }}>
+                        Click "Regenerate" to generate an AI executive narrative.
+                      </p>
+                    )}
+                  </div>
+                </div>
               </section>
 
               {/* 2. Risk Distribution */}
@@ -316,7 +408,7 @@ export default function BoardBriefing({ visible, onClose }: BoardBriefingProps) 
                   </tbody>
                 </table>
                 <p className="briefing-paragraph" style={{ marginTop: 12 }}>
-                  A total of <strong>{penaltyCount}</strong> enforcement actions have been recorded across <strong>{penaltyCompanies}</strong> companies, with cumulative penalties of <strong>{totalPenaltyExposure}</strong>. Legal counsel has been engaged for the highest-exposure items and formal responses are being prepared.
+                  A total of <strong>{penaltyCount}</strong> enforcement actions have been recorded across <strong>{penaltyCompanies}</strong> companies, with cumulative penalties of <strong>{totalPenaltyExposure}</strong>. The largest single penalty exposure is <strong>{maxPenalty}</strong>. Legal counsel has been engaged for all highest-exposure items.
                 </p>
               </section>
 
@@ -384,7 +476,7 @@ export default function BoardBriefing({ visible, onClose }: BoardBriefingProps) 
                   <thead>
                     <tr>
                       <th>Entity</th>
-                      <th>Metric</th>
+                      <th>Total Penalties</th>
                       <th>Detail</th>
                     </tr>
                   </thead>
@@ -392,7 +484,7 @@ export default function BoardBriefing({ visible, onClose }: BoardBriefingProps) 
                     {data.repeat_offenders.map((r, i) => (
                       <tr key={i}>
                         <td>{r.entity_name}</td>
-                        <td>{r.metric_value}</td>
+                        <td className="currency">{formatAud(r.metric_value)}</td>
                         <td>{r.detail}</td>
                       </tr>
                     ))}

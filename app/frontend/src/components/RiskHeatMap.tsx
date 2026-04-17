@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useApi } from "../hooks/useApi";
+import { useRegion } from "../context/RegionContext";
 import { LoadingCard, LoadingStats } from "./LoadingSkeleton";
 import BoardBriefing from "./BoardBriefing";
 import DashboardCharts from "./DashboardCharts";
@@ -90,6 +91,7 @@ function formatCurrency(val: number): string {
 /* ------------------------------------------------------------------ */
 
 export default function RiskHeatMap() {
+  const { market, activeMarket } = useRegion();
   const [selectedCell, setSelectedCell] = useState<HeatmapCell | null>(null);
   const [showBriefing, setShowBriefing] = useState(false);
   const [showRiskBrief, setShowRiskBrief] = useState(false);
@@ -320,7 +322,7 @@ export default function RiskHeatMap() {
       {/* Activity feed */}
       <ActivityFeed />
 
-      <BoardBriefing visible={showBriefing} onClose={() => setShowBriefing(false)} />
+      <BoardBriefing visible={showBriefing} onClose={() => setShowBriefing(false)} market={market} activeMarket={activeMarket} />
       <RiskBrief visible={showRiskBrief} onClose={() => setShowRiskBrief(false)} />
     </div>
   );
