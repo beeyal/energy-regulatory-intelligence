@@ -62,6 +62,7 @@ def list_markets() -> list[dict[str, str]]:
             "name": info["name"],
             "flag": info["flag"],
             "market_name": info["market_name"],
+            "currency": info.get("currency", "AUD"),
             "data_available": str(info.get("data_available", False)).lower(),
         }
         for code, info in MARKETS.items()

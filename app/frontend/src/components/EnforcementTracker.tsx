@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useApi } from "../hooks/useApi";
+import { useRegion } from "../context/RegionContext";
 import { LoadingPage } from "./LoadingSkeleton";
 import EmptyState from "./EmptyState";
 import ErrorState from "./ErrorState";
 import FreshnessBadge from "./FreshnessBadge";
 import { downloadCsv } from "../utils/csv";
+import { formatCurrencyFull } from "../utils/currency";
 
 interface EnforcementData {
   records: Record<string, string>[];
@@ -13,20 +15,15 @@ interface EnforcementData {
 
 const ACTION_TYPES = ["All", "Infringement Notice", "Court Proceedings", "Enforceable Undertaking", "Compliance Audit"];
 
-function formatCurrency(val: string | null): string {
-  if (!val || val === "0" || val === "None") return "—";
-  const n = parseFloat(val);
-  if (isNaN(n) || n === 0) return "—";
-  return `$${n.toLocaleString("en-AU")}`;
-}
-
 function formatDate(d: string | null): string {
   if (!d) return "—";
-  try { return new Date(d).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" }); }
+  try { return new Date(d).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" }); }
   catch { return d; }
 }
 
 export default function EnforcementTracker() {
+  const { activeMarket } = useRegion();
+  const currency = activeMarket?.currency ?? "AUD";
   const [actionType, setActionType] = useState("");
   const [sortBy, setSortBy] = useState("penalty_aud");
 
@@ -49,7 +46,7 @@ export default function EnforcementTracker() {
         </div>
         <div className="stat-card">
           <div className="label">Total Penalties</div>
-          <div className="value amber">{formatCurrency(summary.total_penalties)}</div>
+          <div className="value amber">{formatCurrencyFull(summary.total_penalties, currency)}</div>
         </div>
         <div className="stat-card">
           <div className="label">Companies Affected</div>
@@ -57,7 +54,7 @@ export default function EnforcementTracker() {
         </div>
         <div className="stat-card">
           <div className="label">Largest Fine</div>
-          <div className="value red">{formatCurrency(summary.max_penalty)}</div>
+          <div className="value red">{formatCurrencyFull(summary.max_penalty, currency)}</div>
         </div>
       </div>
 
@@ -130,7 +127,7 @@ export default function EnforcementTracker() {
                   </td>
                   <td>{r.breach_type}</td>
                   <td className="truncate" title={r.breach_description}>{r.breach_description}</td>
-                  <td className="number currency">{formatCurrency(r.penalty_aud)}</td>
+                  <td className="number currency">{formatCurrencyFull(r.penalty_aud, currency)}</td>
                   <td>{r.outcome}</td>
                   <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{r.regulatory_reference}</td>
                 </tr>

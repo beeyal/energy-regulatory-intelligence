@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { MarketInfo } from "../context/RegionContext";
 import MarkdownRenderer from "./MarkdownRenderer";
+import { formatCurrency } from "../utils/currency";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -80,13 +81,6 @@ function SeverityBadge({ level }: { level: "critical" | "warning" | "info" | "im
   return <span className={`severity ${cls}`}>{label}</span>;
 }
 
-function formatAud(val: string | number): string {
-  const num = typeof val === "string" ? parseFloat(val) : val;
-  if (isNaN(num)) return "$0";
-  if (num >= 1e6) return `$${(num / 1e6).toFixed(1)}M`;
-  if (num >= 1e3) return `$${(num / 1e3).toFixed(0)}K`;
-  return `$${num.toFixed(0)}`;
-}
 
 function severityFromRating(rating: string): "critical" | "warning" | "info" {
   const lower = rating.toLowerCase();
@@ -106,6 +100,7 @@ const BRIEFING_DATE = new Date().toLocaleDateString("en-AU", {
 /* ------------------------------------------------------------------ */
 
 export default function BoardBriefing({ visible, onClose, market = "AU", activeMarket }: BoardBriefingProps) {
+  const currency = activeMarket?.currency ?? "AUD";
   const marketName = activeMarket?.market_name ?? activeMarket?.name ?? market;
   const marketFlag = activeMarket?.flag ?? "";
   // Derive a plausible company display name from the market
@@ -214,9 +209,9 @@ export default function BoardBriefing({ visible, onClose, market = "AU", activeM
   const totalObligations = data
     ? data.risk_distribution.reduce((sum, r) => sum + parseInt(r.count, 10), 0)
     : 0;
-  const totalPenaltyExposure = data ? formatAud(data.penalty_summary.total) : "$0";
+  const totalPenaltyExposure = data ? formatCurrency(data.penalty_summary.total, currency) : "—";
   const penaltyCompanies = data?.penalty_summary.companies ?? "0";
-  const maxPenalty = data ? formatAud(data.penalty_summary.max_penalty) : "$0";
+  const maxPenalty = data ? formatCurrency(data.penalty_summary.max_penalty, currency) : "—";
   const penaltyCount = data?.penalty_summary.count ?? "0";
   const complianceRate = totalObligations > 0
     ? Math.round(((totalObligations - parseInt(criticalCount, 10)) / totalObligations) * 100)
@@ -402,7 +397,7 @@ export default function BoardBriefing({ visible, onClose, market = "AU", activeM
                         <td>{e.company_name}</td>
                         <td>{e.action_type}</td>
                         <td>{e.breach_description}</td>
-                        <td className="currency">{formatAud(e.penalty_aud)}</td>
+                        <td className="currency">{formatCurrency(e.penalty_aud, currency)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -434,7 +429,7 @@ export default function BoardBriefing({ visible, onClose, market = "AU", activeM
                         <td>{o.obligation_name}</td>
                         <td>{o.regulatory_body}</td>
                         <td>{o.category}</td>
-                        <td className="currency">{formatAud(o.penalty_max_aud)}</td>
+                        <td className="currency">{formatCurrency(o.penalty_max_aud, currency)}</td>
                         <td>{o.frequency}</td>
                       </tr>
                     ))}
@@ -459,7 +454,7 @@ export default function BoardBriefing({ visible, onClose, market = "AU", activeM
                     {data.top_emitters.map((e, i) => (
                       <tr key={i}>
                         <td>{e.corporation_name}</td>
-                        <td>{parseFloat(e.scope1).toLocaleString("en-AU", { maximumFractionDigits: 0 })} tCO2-e</td>
+                        <td>{parseFloat(e.scope1).toLocaleString(undefined, { maximumFractionDigits: 0 })} tCO2-e</td>
                       </tr>
                     ))}
                   </tbody>
@@ -484,7 +479,7 @@ export default function BoardBriefing({ visible, onClose, market = "AU", activeM
                     {data.repeat_offenders.map((r, i) => (
                       <tr key={i}>
                         <td>{r.entity_name}</td>
-                        <td className="currency">{formatAud(r.metric_value)}</td>
+                        <td className="currency">{formatCurrency(r.metric_value, currency)}</td>
                         <td>{r.detail}</td>
                       </tr>
                     ))}

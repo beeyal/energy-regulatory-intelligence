@@ -5,6 +5,7 @@ export interface MarketInfo {
   name: string;
   flag: string;
   market_name: string;
+  currency: string;
   data_available: string; // "true" | "false" (from API)
 }
 

@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useApi } from "../hooks/useApi";
 import { useRegion } from "../context/RegionContext";
+import { formatCurrency } from "../utils/currency";
 import { LoadingCard, LoadingStats } from "./LoadingSkeleton";
 import BoardBriefing from "./BoardBriefing";
 import DashboardCharts from "./DashboardCharts";
@@ -80,11 +81,6 @@ function riskLabel(score: number): string {
   return "High";
 }
 
-function formatCurrency(val: number): string {
-  if (val >= 1e6) return `$${(val / 1e6).toFixed(1)}M`;
-  if (val >= 1e3) return `$${(val / 1e3).toFixed(0)}K`;
-  return `$${val}`;
-}
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
@@ -92,6 +88,7 @@ function formatCurrency(val: number): string {
 
 export default function RiskHeatMap() {
   const { market, activeMarket } = useRegion();
+  const currency = activeMarket?.currency ?? "AUD";
   const [selectedCell, setSelectedCell] = useState<HeatmapCell | null>(null);
   const [showBriefing, setShowBriefing] = useState(false);
   const [showRiskBrief, setShowRiskBrief] = useState(false);
@@ -169,7 +166,7 @@ export default function RiskHeatMap() {
           </div>
           <div className="stat-card">
             <div className="label">Total Exposure</div>
-            <div className="value amber">{formatCurrency(totalExposure)}</div>
+            <div className="value amber">{formatCurrency(totalExposure, currency)}</div>
           </div>
           <div className="stat-card">
             <div className="label">Avg Risk Score</div>
@@ -306,14 +303,14 @@ export default function RiskHeatMap() {
             </div>
             <div className="heatmap-detail-stat">
               <div className="label">Financial Exposure</div>
-              <div className="value amber" style={{ fontSize: 28 }}>{formatCurrency(selectedCell.financialExposure)}</div>
+              <div className="value amber" style={{ fontSize: 28 }}>{formatCurrency(selectedCell.financialExposure, currency)}</div>
             </div>
           </div>
 
           {/* Contextual detail based on the cell */}
           <div className="heatmap-detail-context">
             <p style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: 1.6 }}>
-              {getCellDescription(selectedCell)}
+              {getCellDescription(selectedCell, currency)}
             </p>
           </div>
         </div>
@@ -332,7 +329,7 @@ export default function RiskHeatMap() {
 /*  Contextual descriptions for key cells                              */
 /* ------------------------------------------------------------------ */
 
-function getCellDescription(cell: HeatmapCell): string {
+function getCellDescription(cell: HeatmapCell, currency = "AUD"): string {
   const key = `${cell.regulator}|${cell.category}`;
   const descriptions: Record<string, string> = {
     "CER|Environmental & Emissions":
@@ -351,5 +348,5 @@ function getCellDescription(cell: HeatmapCell): string {
       "Elevated: Settlement data integrity requirements under 5-minute settlement regime. Seven obligations relating to metering data, prudential requirements, and market fee calculations. Next prudential review in 28 days.",
   };
   return descriptions[key] ||
-    `${cell.regulator} has ${cell.obligations} active ${cell.category.toLowerCase()} obligations. The next compliance deadline is in ${cell.daysToDeadline} days with an estimated financial exposure of ${formatCurrency(cell.financialExposure)}. Risk score of ${cell.riskScore}/100 is classified as ${riskLabel(cell.riskScore).toLowerCase()} risk.`;
+    `${cell.regulator} has ${cell.obligations} active ${cell.category.toLowerCase()} obligations. The next compliance deadline is in ${cell.daysToDeadline} days with an estimated financial exposure of ${formatCurrency(cell.financialExposure, currency)}. Risk score of ${cell.riskScore}/100 is classified as ${riskLabel(cell.riskScore).toLowerCase()} risk.`;
 }

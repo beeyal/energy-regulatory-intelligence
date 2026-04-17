@@ -1,4 +1,6 @@
 import { useApi } from "../hooks/useApi";
+import { useRegion } from "../context/RegionContext";
+import { formatCurrency } from "../utils/currency";
 
 interface Deadline {
   obligation_name: string;
@@ -35,17 +37,14 @@ function urgencyLabel(days: number): string {
   return "SCHEDULED";
 }
 
-function formatPenalty(val: number): string {
-  if (val >= 1e6) return `$${(val / 1e6).toFixed(1)}M`;
-  if (val >= 1e3) return `$${(val / 1e3).toFixed(0)}K`;
-  return `$${val}`;
-}
 
 function riskDot(rating: string): string {
   return { Critical: "#EF4444", High: "#F59E0B", Medium: "#3B82F6", Low: "#10B981" }[rating] ?? "#6B7280";
 }
 
 export default function DeadlineTracker() {
+  const { activeMarket } = useRegion();
+  const currency = activeMarket?.currency ?? "AUD";
   const { data, loading } = useApi<DeadlineData>("/api/upcoming-deadlines");
 
   if (loading || !data) {
@@ -125,7 +124,7 @@ export default function DeadlineTracker() {
                   {urgencyLabel(d.days_to_deadline)}
                 </span>
                 <span style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0 }}>
-                  max {formatPenalty(d.penalty_max_aud)}
+                  max {formatCurrency(d.penalty_max_aud, currency)}
                 </span>
               </div>
             </div>

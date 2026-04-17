@@ -13,7 +13,9 @@ import {
   Legend,
 } from "recharts";
 import { useApi } from "../hooks/useApi";
+import { useRegion } from "../context/RegionContext";
 import { LoadingPage } from "./LoadingSkeleton";
+import { formatCurrency } from "../utils/currency";
 
 interface YearlyForecast {
   year: number;
@@ -46,13 +48,9 @@ function formatNum(val: number): string {
   return val.toFixed(0);
 }
 
-function formatCurrency(val: number): string {
-  if (val >= 1e6) return `$${(val / 1e6).toFixed(1)}M`;
-  if (val >= 1e3) return `$${(val / 1e3).toFixed(0)}K`;
-  return `$${val.toFixed(0)}`;
-}
-
 export default function EmissionsForecaster() {
+  const { activeMarket } = useRegion();
+  const currency = activeMarket?.currency ?? "AUD";
   const { data, loading } = useApi<ForecastData>("/api/emissions-forecast");
   const [selectedCompany, setSelectedCompany] = useState<string>("");
 
@@ -94,7 +92,7 @@ export default function EmissionsForecaster() {
         </div>
         <div className="stat-card">
           <div className="label">2029 Exposure (All)</div>
-          <div className="value amber">{formatCurrency(totalExposure)}</div>
+          <div className="value amber">{formatCurrency(totalExposure, currency)}</div>
         </div>
         <div className="stat-card">
           <div className="label">Baseline Decline</div>
@@ -228,7 +226,7 @@ export default function EmissionsForecaster() {
                           )}
                         </td>
                         <td className="number" style={{ color: y.shortfall_cost_aud > 0 ? "var(--accent-red)" : "inherit" }}>
-                          {y.shortfall_cost_aud > 0 ? formatCurrency(y.shortfall_cost_aud) : "—"}
+                          {y.shortfall_cost_aud > 0 ? formatCurrency(y.shortfall_cost_aud, currency) : "—"}
                         </td>
                       </tr>
                     );

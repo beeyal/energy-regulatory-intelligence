@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useApi } from "../hooks/useApi";
+import { useRegion } from "../context/RegionContext";
 import { LoadingPage } from "./LoadingSkeleton";
 import EmptyState from "./EmptyState";
 import ErrorState from "./ErrorState";
 import { downloadCsv } from "../utils/csv";
+import { formatCurrencyFull } from "../utils/currency";
 
 interface ObligationsData {
   records: Record<string, string>[];
@@ -24,14 +26,9 @@ function riskClass(risk: string): string {
   }
 }
 
-function formatCurrency(val: string | null): string {
-  if (!val) return "—";
-  const n = parseFloat(val);
-  if (isNaN(n)) return "—";
-  return `$${n.toLocaleString("en-AU")}`;
-}
-
 export default function ObligationRegister() {
+  const { activeMarket } = useRegion();
+  const currency = activeMarket?.currency ?? "AUD";
   const [body, setBody] = useState("");
   const [category, setCategory] = useState("");
   const [risk, setRisk] = useState("");
@@ -141,7 +138,7 @@ export default function ObligationRegister() {
                     <td>{r.category}</td>
                     <td>{r.frequency}</td>
                     <td><span className={`severity ${riskClass(r.risk_rating)}`}>{r.risk_rating}</span></td>
-                    <td className="number currency">{formatCurrency(r.penalty_max_aud)}</td>
+                    <td className="number currency">{formatCurrencyFull(r.penalty_max_aud, currency)}</td>
                     <td style={{ fontSize: 11, color: "var(--text-muted)" }}>{r.source_legislation}</td>
                   </tr>
                   {expanded === r.obligation_id && (
