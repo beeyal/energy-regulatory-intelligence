@@ -707,14 +707,15 @@ def _market_avg_risk(market: str) -> int:
 @router.get("/market-risk-scores")
 def market_risk_scores():
     """Aggregate risk score per market for the radar chart."""
-    all_markets = list_markets()
+    all_markets = list_markets()  # returns list of dicts with "code", "name", "flag", ...
     results = []
     for m in all_markets:
+        code = m["code"]
         try:
-            region = get_region(m)
-            score = _market_avg_risk(m)
+            region = get_region(code)
+            score = _market_avg_risk(code)
             results.append({
-                "market": m,
+                "market": code,
                 "name": region.name,
                 "flag": region.flag,
                 "score": score,
