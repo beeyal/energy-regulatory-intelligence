@@ -98,13 +98,17 @@ def emissions_overview(
     df = store.get_store().get("emissions_data", pd.DataFrame())
     if not df.empty and "market" in df.columns:
         df = df[df["market"] == market]
+        scope3_col = "scope3_emissions_tco2e" if "scope3_emissions_tco2e" in df.columns else None
+        agg_dict: dict = {
+            "total_scope1": ("scope1_emissions_tco2e", "sum"),
+            "total_scope2": ("scope2_emissions_tco2e", "sum"),
+            "entity_count": ("corporation_name", "count"),
+        }
+        if scope3_col:
+            agg_dict["total_scope3"] = (scope3_col, "sum")
         state_agg = (
             df.groupby("state", as_index=False)
-            .agg(
-                total_scope1=("scope1_emissions_tco2e", "sum"),
-                total_scope2=("scope2_emissions_tco2e", "sum"),
-                entity_count=("corporation_name", "count"),
-            )
+            .agg(**agg_dict)
             .sort_values("total_scope1", ascending=False)
             .where(pd.notnull, None)
             .to_dict(orient="records")
@@ -148,6 +152,37 @@ def market_notices(
         r["count"] = r.pop("notice_id", 0)
 
     return {"records": rows, "type_distribution": type_dist}
+
+
+# ── Obligation risk score helper ─────────────────────────────────────────────
+
+def _obligation_risk_score(row: dict) -> int:
+    """Compute a 0-100 composite risk score for one obligation row.
+
+    Components:
+      penalty_score  0-40: log-scaled penalty exposure
+      frequency_score 0-30: how often the obligation recurs
+      severity_score  0-30: risk_rating categorical mapping
+    """
+    import math
+
+    penalty = float(row.get("penalty_max_aud") or 0)
+    if penalty > 0:
+        penalty_score = min(40, math.log10(penalty) / math.log10(10_000_000) * 40)
+    else:
+        penalty_score = 0
+
+    freq_map = {
+        "daily": 30, "weekly": 28, "monthly": 20, "quarterly": 15,
+        "bi-annual": 12, "annual": 10, "as required": 5,
+    }
+    freq_raw = str(row.get("frequency") or "").lower()
+    frequency_score = next((v for k, v in freq_map.items() if k in freq_raw), 8)
+
+    severity_map = {"critical": 30, "high": 20, "medium": 10, "low": 5}
+    severity_score = severity_map.get(str(row.get("risk_rating") or "").lower(), 8)
+
+    return min(100, round(penalty_score + frequency_score + severity_score))
 
 
 @router.get("/enforcement")
@@ -234,6 +269,8 @@ def obligations(
         )
         for r in body_dist:
             r["count"] = r.pop("obligation_id", 0)
+        for r in rows:
+            r["risk_score"] = _obligation_risk_score(r)
         return {"records": rows, "body_distribution": body_dist}
 
     rows = store.query(
@@ -246,6 +283,9 @@ def obligations(
     )
     for r in body_dist:
         r["count"] = r.pop("obligation_id", 0)
+
+    for r in rows:
+        r["risk_score"] = _obligation_risk_score(r)
 
     return {"records": rows, "body_distribution": body_dist}
 
@@ -343,7 +383,129 @@ def compliance_gaps(market: str = Query("AU")):
     for row in insights:
         grouped.setdefault(row["insight_type"], []).append(row)
 
-    return {"insights": insights, "grouped": grouped}
+    # ── Analytics: penalty timeline (year-by-year) ────────────────────────────
+    penalty_timeline = []
+    if not enf.empty and "action_date" in enf.columns:
+        enf_copy = enf.copy()
+        enf_copy["year"] = pd.to_datetime(enf_copy["action_date"], errors="coerce").dt.year
+        enf_copy["penalty_aud"] = pd.to_numeric(enf_copy["penalty_aud"], errors="coerce").fillna(0)
+        tl = (
+            enf_copy.dropna(subset=["year"])
+            .groupby("year")["penalty_aud"]
+            .agg(total_penalty="sum", action_count="count")
+            .reset_index()
+            .sort_values("year")
+        )
+        penalty_timeline = [
+            {"year": str(int(r["year"])), "total_penalty": float(r["total_penalty"]), "action_count": int(r["action_count"])}
+            for _, r in tl.iterrows()
+        ]
+
+    # ── Analytics: offenders leaderboard (top 8 by total penalty) ────────────
+    offenders_leaderboard = []
+    if not enf.empty:
+        enf_copy = enf.copy()
+        enf_copy["penalty_aud"] = pd.to_numeric(enf_copy["penalty_aud"], errors="coerce").fillna(0)
+        lb = (
+            enf_copy.groupby("company_name")
+            .agg(
+                total_penalty=("penalty_aud", "sum"),
+                action_count=("penalty_aud", "count"),
+                last_action=("action_date", "max"),
+            )
+            .reset_index()
+            .sort_values("total_penalty", ascending=False)
+            .head(8)
+        )
+        max_penalty = float(lb["total_penalty"].max()) if not lb.empty else 1.0
+        for rank, (_, row) in enumerate(lb.iterrows(), 1):
+            total = float(row["total_penalty"])
+            offenders_leaderboard.append({
+                "rank": rank,
+                "company_name": row["company_name"],
+                "total_penalty": total,
+                "action_count": int(row["action_count"]),
+                "last_action": str(row.get("last_action", ""))[:10],
+                "pct_of_max": round(total / max_penalty * 100, 1) if max_penalty else 0,
+                "severity": "Critical" if total >= 1_000_000 or int(row["action_count"]) >= 3 else "Warning",
+            })
+
+    # ── Analytics: breach type sector breakdown ───────────────────────────────
+    sector_breakdown = []
+    if not enf.empty and "breach_type" in enf.columns:
+        enf_copy = enf.copy()
+        enf_copy["penalty_aud"] = pd.to_numeric(enf_copy["penalty_aud"], errors="coerce").fillna(0)
+        sb = (
+            enf_copy[enf_copy["breach_type"].notna()]
+            .groupby("breach_type")["penalty_aud"]
+            .agg(total_penalty="sum", count="count")
+            .reset_index()
+            .sort_values("total_penalty", ascending=False)
+            .head(8)
+        )
+        max_pen = float(sb["total_penalty"].max()) if not sb.empty else 1.0
+        for _, row in sb.iterrows():
+            total = float(row["total_penalty"])
+            sector_breakdown.append({
+                "breach_type": row["breach_type"],
+                "total_penalty": total,
+                "count": int(row["count"]),
+                "pct_of_max": round(total / max_pen * 100, 1) if max_pen else 0,
+            })
+
+    # ── Analytics: emissions profile (top emitters by scope1) ────────────────
+    emissions_profile = []
+    if not emi.empty:
+        emi_copy = emi.copy()
+        emi_copy["scope1_emissions_tco2e"] = pd.to_numeric(emi_copy["scope1_emissions_tco2e"], errors="coerce").fillna(0)
+        emi_copy["scope2_emissions_tco2e"] = pd.to_numeric(emi_copy.get("scope2_emissions_tco2e", pd.Series(dtype=float)), errors="coerce").fillna(0)
+        ep = (
+            emi_copy.groupby("corporation_name", as_index=False)
+            .agg(scope1=("scope1_emissions_tco2e", "sum"), scope2=("scope2_emissions_tco2e", "sum"))
+            .nlargest(8, "scope1")
+        )
+        max_s1 = float(ep["scope1"].max()) if not ep.empty else 1.0
+        for _, row in ep.iterrows():
+            s1 = float(row["scope1"])
+            s2 = float(row["scope2"])
+            emissions_profile.append({
+                "corporation_name": row["corporation_name"],
+                "scope1": s1,
+                "scope2": s2,
+                "total": s1 + s2,
+                "pct_of_max": round(s1 / max_s1 * 100, 1) if max_s1 else 0,
+            })
+
+    # ── Summary KPIs ──────────────────────────────────────────────────────────
+    total_penalty_exposure = sum(i["metric_value"] for i in insights if i["insight_type"] == "repeat_offender")
+    critical_count = sum(1 for i in insights if i["severity"] == "Critical")
+    warning_count = sum(1 for i in insights if i["severity"] == "Warning")
+    total_actions = len(enf) if not enf.empty else 0
+    top_offender = offenders_leaderboard[0]["company_name"] if offenders_leaderboard else None
+    yoy_change = None
+    if len(penalty_timeline) >= 2:
+        prev = penalty_timeline[-2]["total_penalty"]
+        curr = penalty_timeline[-1]["total_penalty"]
+        yoy_change = round((curr - prev) / prev * 100, 1) if prev else None
+
+    summary = {
+        "total_exposure": total_penalty_exposure,
+        "critical_count": critical_count,
+        "warning_count": warning_count,
+        "total_actions": total_actions,
+        "top_offender": top_offender,
+        "yoy_change": yoy_change,
+    }
+
+    return {
+        "insights": insights,
+        "grouped": grouped,
+        "summary": summary,
+        "penalty_timeline": penalty_timeline,
+        "offenders_leaderboard": offenders_leaderboard,
+        "sector_breakdown": sector_breakdown,
+        "emissions_profile": emissions_profile,
+    }
 
 
 @router.get("/metadata")
@@ -588,14 +750,129 @@ def emissions_forecast(market: str = Query("AU")):
             "first_breach_year": next((y["year"] for y in yearly if y["breach"]), None),
         })
 
+    # ── Compliance headroom for current year (2024) ──────────────────────────
+    headroom_data = []
+    for f in forecasts:
+        y0 = f["trajectory"][0] if f["trajectory"] else None
+        if y0:
+            gap = y0["baseline_tco2e"] - y0["projected_tco2e"]
+            headroom_pct = round(gap / y0["baseline_tco2e"] * 100, 1) if y0["baseline_tco2e"] > 0 else 0
+            headroom_tco2e = round(gap)
+            headroom_data.append({
+                "company": f["company"],
+                "current_tco2e": round(y0["projected_tco2e"]),
+                "baseline_tco2e": round(y0["baseline_tco2e"]),
+                "headroom_tco2e": headroom_tco2e,
+                "headroom_pct": headroom_pct,
+                "status": "safe" if headroom_pct >= 15 else "warning" if headroom_pct >= 0 else "breach",
+            })
+
     return {
         "forecasts": forecasts,
+        "headroom": sorted(headroom_data, key=lambda h: h["headroom_pct"]),
         "safeguard_params": {
             "baseline_decline_rate": decline,
-            "price_aud": price,
+            "accu_price_aud": price,
             "shortfall_multiplier": multiplier,
             "scheme_name": scheme_name,
             "note": f"{scheme_name} baseline decline {decline*100:.1f}%/year. Shortfall charge {multiplier:.2f}× price.",
+        },
+    }
+
+
+@router.get("/market-posture")
+def market_posture():
+    """Cross-market compliance posture summary — all 8 APJ markets."""
+    s = store.get_store()
+    enf_df  = s.get("enforcement_actions", pd.DataFrame())
+    obl_df  = s.get("regulatory_obligations", pd.DataFrame())
+    emi_df  = s.get("emissions_data", pd.DataFrame())
+    not_df  = s.get("market_notices", pd.DataFrame())
+    all_markets = list_markets()
+
+    def _safe_mdf(df, market_code):
+        if df.empty or "market" not in df.columns:
+            return pd.DataFrame()
+        return df[df["market"] == market_code].copy()
+
+    markets_out = []
+    for m in all_markets:
+        code = m["code"]
+        menf = _safe_mdf(enf_df, code)
+        mobl = _safe_mdf(obl_df, code)
+        memi = _safe_mdf(emi_df, code)
+        mnot = _safe_mdf(not_df, code)
+
+        # Enforcement stats
+        enf_count = len(menf)
+        if not menf.empty and "penalty_aud" in menf.columns:
+            total_penalty = float(pd.to_numeric(menf["penalty_aud"], errors="coerce").fillna(0).sum())
+            last_enf_date = str(menf.sort_values("action_date", ascending=False).iloc[0].get("action_date", ""))[:10] if "action_date" in menf.columns else ""
+        else:
+            total_penalty, last_enf_date = 0.0, ""
+
+        # Obligation stats
+        critical_obs = 0
+        avg_risk_score = 0
+        if not mobl.empty:
+            critical_obs = int((mobl.get("risk_rating", pd.Series(dtype=str)) == "Critical").sum())
+            mobl["penalty_max_aud"] = pd.to_numeric(mobl.get("penalty_max_aud", pd.Series(dtype=float)), errors="coerce").fillna(0)
+            scores = [_obligation_risk_score(r) for _, r in mobl.iterrows()]
+            avg_risk_score = round(sum(scores) / len(scores)) if scores else 0
+
+        # Emissions headroom (current year vs ~4.9% below current)
+        headroom_pct = None
+        if not memi.empty and "scope1_emissions_tco2e" in memi.columns:
+            try:
+                region_cfg = get_region(code)
+                decline = region_cfg.carbon_scheme.baseline_decline_pct / 100.0 if region_cfg.carbon_scheme else 0.049
+            except Exception:
+                decline = 0.049
+            scope1 = float(pd.to_numeric(memi["scope1_emissions_tco2e"], errors="coerce").fillna(0).sum())
+            if scope1 > 0:
+                baseline = scope1 * (1 - decline)
+                projected = scope1 * (1 - 0.02)
+                headroom_pct = round((baseline - projected) / baseline * 100, 1)
+
+        # Notices in last 30 days (proxy)
+        recent_notices = len(mnot.head(30)) if not mnot.empty else 0
+
+        # Overall status
+        if avg_risk_score >= 65 or critical_obs >= 5 or (headroom_pct is not None and headroom_pct < 0):
+            status = "Critical"
+        elif avg_risk_score >= 45 or critical_obs >= 2 or enf_count >= 5:
+            status = "Attention"
+        else:
+            status = "Compliant"
+
+        markets_out.append({
+            "code": code,
+            "name": m["name"],
+            "flag": m["flag"],
+            "currency": m["currency"],
+            "market_name": m["market_name"],
+            "data_available": m["data_available"],
+            "enforcement_count": enf_count,
+            "total_penalty": total_penalty,
+            "last_enforcement": last_enf_date,
+            "critical_obligations": critical_obs,
+            "total_obligations": len(mobl),
+            "avg_risk_score": avg_risk_score,
+            "headroom_pct": headroom_pct,
+            "recent_notices": recent_notices,
+            "status": status,
+        })
+
+    # Summary
+    data_markets = [m for m in markets_out if m["data_available"] == "true"]
+    return {
+        "markets": markets_out,
+        "summary": {
+            "total_markets": len(markets_out),
+            "data_available": len(data_markets),
+            "critical_markets": sum(1 for m in markets_out if m["status"] == "Critical"),
+            "attention_markets": sum(1 for m in markets_out if m["status"] == "Attention"),
+            "total_global_exposure": sum(m["total_penalty"] for m in markets_out),
         },
     }
 
@@ -810,34 +1087,127 @@ def market_risk_scores():
 
 @router.get("/upcoming-deadlines")
 def upcoming_deadlines(market: str = Query("AU")):
-    """Top obligations by proximity to deadline."""
+    """Top obligations by proximity to deadline, including overdue items."""
     df_obl = store.get_store().get("regulatory_obligations", pd.DataFrame())
     if df_obl.empty or "market" not in df_obl.columns:
-        return {"deadlines": []}
+        return {"deadlines": [], "overdue_count": 0}
 
     mobl = df_obl[df_obl["market"] == market].copy()
     if mobl.empty:
-        return {"deadlines": []}
+        return {"deadlines": [], "overdue_count": 0}
 
     def _days(obligation_id: str) -> int:
+        """Deterministic pseudo-random days offset — negative = overdue."""
         h = abs(hash(str(obligation_id))) & 0x7FFFFFFF
-        return 3 + (h % 88)  # 3-90 days
+        # ~15% overdue (negative), rest within 90 days spread
+        bucket = h % 20
+        if bucket < 3:
+            return -(1 + (h % 21))       # -1 to -21 days overdue
+        return 2 + (h % 89)              # 2-90 days upcoming
 
     rows = []
     for _, row in mobl.iterrows():
         days = _days(str(row.get("obligation_id", row.get("obligation_name", ""))))
+        penalty = float(pd.to_numeric(row.get("penalty_max_aud", 0), errors="coerce") or 0)
         rows.append({
             "obligation_name": row.get("obligation_name", ""),
             "regulatory_body": row.get("regulatory_body", ""),
             "category": row.get("category", ""),
             "risk_rating": row.get("risk_rating", ""),
-            "penalty_max_aud": float(pd.to_numeric(row.get("penalty_max_aud", 0), errors="coerce") or 0),
+            "penalty_max_aud": penalty,
             "frequency": row.get("frequency", ""),
             "days_to_deadline": days,
+            "risk_score": _obligation_risk_score(row.to_dict()),
         })
 
     rows.sort(key=lambda r: r["days_to_deadline"])
-    return {"deadlines": rows[:10]}
+    overdue_count = sum(1 for r in rows if r["days_to_deadline"] < 0)
+    return {"deadlines": rows[:12], "overdue_count": overdue_count}
+
+
+@router.get("/regulatory-horizon")
+def regulatory_horizon(market: str = Query("AU"), days: int = Query(180, le=365)):
+    """Regulatory horizon scanning — categorised feed of recent notices and obligations."""
+    s = store.get_store()
+    notices_df = s.get("market_notices", pd.DataFrame())
+    obl_df = s.get("regulatory_obligations", pd.DataFrame())
+
+    items = []
+
+    # ── Market notices → horizon events ──────────────────────────────────────
+    def _notice_category(notice_type: str) -> str:
+        nt = (notice_type or "").upper()
+        if "NON-CONFORM" in nt or "INFRINGEMENT" in nt:
+            return "Enforcement"
+        if "SUSPENSION" in nt or "DIRECTION" in nt:
+            return "Critical Alert"
+        if "RESERVE" in nt or "INTER-REGIONAL" in nt:
+            return "Grid Alert"
+        if "RECLASSIF" in nt:
+            return "Policy Change"
+        return "Market Update"
+
+    def _notice_severity(category: str) -> str:
+        return {"Enforcement": "Critical", "Critical Alert": "Critical",
+                "Grid Alert": "Warning", "Policy Change": "Warning"}.get(category, "Info")
+
+    if not notices_df.empty and "market" in notices_df.columns:
+        mn = notices_df[notices_df["market"] == market].copy()
+        mn["_dt"] = pd.to_datetime(mn.get("creation_date", mn.get("issue_date")), errors="coerce")
+        cutoff = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=days)
+        mn = mn[mn["_dt"].notna()]
+        # Use all if no dates, fallback to top 40
+        recent = mn.sort_values("_dt", ascending=False).head(40)
+        for _, row in recent.iterrows():
+            cat = _notice_category(str(row.get("notice_type", "")))
+            sev = _notice_severity(cat)
+            dt = row["_dt"]
+            items.append({
+                "id": str(row.get("notice_id", "")),
+                "type": "market_notice",
+                "category": cat,
+                "severity": sev,
+                "title": str(row.get("notice_type", "Market Notice")),
+                "body": str(row.get("reason", ""))[:200],
+                "source": f"AEMO — {row.get('region', '')}",
+                "date": dt.strftime("%Y-%m-%d") if pd.notna(dt) else "",
+                "reference": str(row.get("external_reference", "")),
+            })
+
+    # ── Critical/High obligations → "Obligation Watch" items ─────────────────
+    if not obl_df.empty and "market" in obl_df.columns:
+        mo = obl_df[obl_df["market"] == market]
+        watch = mo[mo["risk_rating"].isin(["Critical", "High"])].head(15)
+        for _, row in watch.iterrows():
+            items.append({
+                "id": str(row.get("obligation_id", "")),
+                "type": "obligation",
+                "category": "Obligation Watch",
+                "severity": row.get("risk_rating", "Warning"),
+                "title": str(row.get("obligation_name", ""))[:80],
+                "body": str(row.get("description", ""))[:200],
+                "source": str(row.get("regulatory_body", "")),
+                "date": "",  # obligations are standing requirements
+                "reference": str(row.get("source_legislation", "")),
+            })
+
+    # Summary counts
+    by_category: dict = {}
+    for item in items:
+        by_category[item["category"]] = by_category.get(item["category"], 0) + 1
+
+    critical_count = sum(1 for i in items if i["severity"] == "Critical")
+    enforcement_count = sum(1 for i in items if i["category"] == "Enforcement")
+
+    return {
+        "items": items,
+        "summary": {
+            "total": len(items),
+            "critical": critical_count,
+            "enforcement": enforcement_count,
+            "by_category": by_category,
+        },
+    }
 
 
 @router.get("/activity-feed")
@@ -941,6 +1311,341 @@ async def risk_brief(market: str = Query("AU")):
             yield {"event": "error", "data": str(e)}
 
     return EventSourceResponse(event_generator())
+
+
+# ── Peer benchmarking endpoint ───────────────────────────────────────────────
+
+@router.get("/peer-benchmark")
+def peer_benchmark(market: str = Query("AU")):
+    """Anonymised cross-company compliance benchmark — enforcement, emissions, obligations."""
+    s = store.get_store()
+    enf = s.get("enforcement_actions", pd.DataFrame())
+    emi = s.get("emissions_data", pd.DataFrame())
+    obl = s.get("regulatory_obligations", pd.DataFrame())
+
+    companies: dict = {}
+
+    # Enforcement data
+    if not enf.empty and "market" in enf.columns:
+        menf = enf[enf["market"] == market]
+        for _, row in menf.iterrows():
+            name = row.get("company_name", "Unknown")
+            if name not in companies:
+                companies[name] = {"name": name, "actions": 0, "total_penalties": 0, "scope1": 0, "scope2": 0, "scope3": 0}
+            companies[name]["actions"] += 1
+            pen = float(pd.to_numeric(row.get("penalty_aud", 0), errors="coerce") or 0)
+            companies[name]["total_penalties"] += pen
+
+    # Emissions data (aggregate by corporation)
+    if not emi.empty and "market" in emi.columns:
+        memi = emi[emi["market"] == market].copy()
+        for col in ("scope1_emissions_tco2e", "scope2_emissions_tco2e", "scope3_emissions_tco2e"):
+            if col in memi.columns:
+                memi[col] = pd.to_numeric(memi[col], errors="coerce").fillna(0)
+        for corp, grp in memi.groupby("corporation_name"):
+            if corp not in companies:
+                companies[corp] = {"name": corp, "actions": 0, "total_penalties": 0, "scope1": 0, "scope2": 0, "scope3": 0}
+            companies[corp]["scope1"] += float(grp["scope1_emissions_tco2e"].sum()) if "scope1_emissions_tco2e" in grp else 0
+            companies[corp]["scope2"] += float(grp["scope2_emissions_tco2e"].sum()) if "scope2_emissions_tco2e" in grp else 0
+            companies[corp]["scope3"] += float(grp["scope3_emissions_tco2e"].sum()) if "scope3_emissions_tco2e" in grp else 0
+
+    rows = list(companies.values())
+
+    # Compute percentiles
+    def _pct(values: list[float], target: float) -> int:
+        if not values or max(values) == 0:
+            return 50
+        below = sum(1 for v in values if v < target)
+        return round(below / len(values) * 100)
+
+    all_actions = [r["actions"] for r in rows]
+    all_penalties = [r["total_penalties"] for r in rows]
+    all_scope1 = [r["scope1"] for r in rows if r["scope1"] > 0]
+
+    for r in rows:
+        r["actions_pct"] = _pct(all_actions, r["actions"])
+        r["penalties_pct"] = _pct(all_penalties, r["total_penalties"])
+        r["emissions_pct"] = _pct(all_scope1, r["scope1"]) if r["scope1"] > 0 else 0
+        # Compliance score: inverse of enforcement + emissions pressure (0–100, higher = better)
+        enforcement_risk = min(50, r["actions"] * 12 + r["total_penalties"] / 2_000_000)
+        emissions_risk = min(30, r["scope1"] / 1_000_000 * 2)
+        r["compliance_score"] = max(0, round(100 - enforcement_risk - emissions_risk))
+
+    rows.sort(key=lambda r: -r["compliance_score"])
+
+    # Market averages
+    avg_actions = round(sum(r["actions"] for r in rows) / max(len(rows), 1), 1)
+    avg_scope1 = round(sum(r["scope1"] for r in rows) / max(len(rows), 1))
+    avg_score = round(sum(r["compliance_score"] for r in rows) / max(len(rows), 1))
+
+    return {
+        "companies": rows,
+        "market_averages": {
+            "avg_enforcement_actions": avg_actions,
+            "avg_scope1_tco2e": avg_scope1,
+            "avg_compliance_score": avg_score,
+        },
+    }
+
+
+# ── Alert notifications endpoint ──────────────────────────────────────────────
+
+@router.get("/notifications")
+def notifications(market: str = Query("AU")):
+    """Compute actionable alerts: overdue obligations, critical enforcement, breach risk."""
+    from datetime import date
+    s = store.get_store()
+    enf = s.get("enforcement_actions", pd.DataFrame())
+    obl = s.get("regulatory_obligations", pd.DataFrame())
+
+    alerts = []
+
+    # Overdue obligations
+    today = date.today()
+    if not obl.empty and "market" in obl.columns and "frequency" in obl.columns:
+        mobl = obl[obl["market"] == market]
+        for _, row in mobl.iterrows():
+            if str(row.get("risk_rating", "")).lower() in ("critical", "high"):
+                # Simulate overdue: ~15% of critical/high obligations
+                import hashlib
+                seed = int(hashlib.md5((str(row.get("obligation_id", "")) + market).encode()).hexdigest()[:8], 16)
+                if seed % 7 == 0:  # ~14% chance
+                    alerts.append({
+                        "type": "overdue",
+                        "severity": "critical",
+                        "title": f"Obligation overdue: {row.get('obligation_name', '')[:50]}",
+                        "body": f"{row.get('regulatory_body')} · Max penalty ${float(pd.to_numeric(row.get('penalty_max_aud', 0), errors='coerce') or 0):,.0f}",
+                        "action": "Review and remediate immediately",
+                        "ts": today.isoformat(),
+                    })
+
+    # Critical enforcement actions (most recent)
+    if not enf.empty and "market" in enf.columns:
+        menf = enf[enf["market"] == market].copy()
+        menf["penalty_aud"] = pd.to_numeric(menf["penalty_aud"], errors="coerce").fillna(0)
+        top = menf.nlargest(3, "penalty_aud")
+        for _, row in top.iterrows():
+            pen = float(row.get("penalty_aud", 0) or 0)
+            if pen >= 500_000:
+                alerts.append({
+                    "type": "enforcement",
+                    "severity": "high",
+                    "title": f"Large penalty: {row.get('company_name', '')}",
+                    "body": f"${pen/1e6:.2f}M — {str(row.get('breach_description', ''))[:60]}",
+                    "action": "Review for similar exposure in your operations",
+                    "ts": str(row.get("action_date", ""))[:10],
+                })
+
+    # High risk obligations approaching
+    if not obl.empty and "market" in obl.columns:
+        mobl = obl[obl["market"] == market]
+        critical_count = int((mobl["risk_rating"] == "Critical").sum()) if not mobl.empty else 0
+        if critical_count >= 5:
+            alerts.append({
+                "type": "risk",
+                "severity": "warning",
+                "title": f"{critical_count} Critical obligations require monitoring",
+                "body": "Review your critical obligation register and confirm compliance status",
+                "action": "Open Obligations tab and assign owners",
+                "ts": today.isoformat(),
+            })
+
+    return {"alerts": alerts[:12], "unread": len(alerts)}
+
+
+# ── Impact analysis endpoint ──────────────────────────────────────────────────
+
+class ImpactRequest(BaseModel):
+    regulation_text: str
+    market: str = "AU"
+
+
+@router.post("/impact-analysis")
+def impact_analysis(req: ImpactRequest):
+    """AI-powered analysis of how a regulatory change affects current obligations."""
+    market = req.market
+    reg_text = req.regulation_text[:3000]  # cap input
+
+    # Pull obligation context
+    obl_rows = store.query(
+        "regulatory_obligations", market=market,
+        sort_by="penalty_max_aud", limit=40,
+    )
+    obl_context = "\n".join(
+        f"[{r.get('obligation_id')}] {r.get('obligation_name')} — "
+        f"Body: {r.get('regulatory_body')}, Category: {r.get('category')}, "
+        f"Risk: {r.get('risk_rating')}, Penalty: ${r.get('penalty_max_aud', 0):,}"
+        for r in obl_rows
+    )
+
+    prompt = (
+        f"You are an expert energy regulatory analyst. A new regulatory change has been proposed or published. "
+        f"Analyse how it affects the existing obligation register.\n\n"
+        f"### Regulatory Change\n{reg_text}\n\n"
+        f"### Existing Obligations Register\n{obl_context}\n\n"
+        f"Return a JSON object with exactly this structure (no markdown, raw JSON only):\n"
+        f'{{"impact_summary": "2-3 sentence executive summary", '
+        f'"risk_level": "Critical|High|Medium|Low", '
+        f'"affected_obligations": [{{"id": "OBL-XXXX", "name": "...", "reason": "why affected", "action": "recommended action", "urgency": "Immediate|Short-term|Medium-term"}}], '
+        f'"new_obligations": ["description of any new obligations implied"], '
+        f'"recommendations": ["action 1", "action 2", "action 3"]}}'
+    )
+
+    try:
+        from .llm import _get_openai_client
+        from .config import get_model_endpoint
+        client = _get_openai_client()
+        resp = client.chat.completions.create(
+            model=get_model_endpoint(),
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=1200,
+            temperature=0.2,
+        )
+        raw = resp.choices[0].message.content or "{}"
+        # Strip markdown code fences if present
+        raw = re.sub(r"^```(?:json)?\s*", "", raw.strip())
+        raw = re.sub(r"\s*```$", "", raw.strip())
+        result = json.loads(raw)
+    except Exception as e:
+        logger.error(f"Impact analysis LLM error: {e}")
+        # Keyword-based fallback
+        affected = []
+        reg_lower = reg_text.lower()
+        for r in obl_rows:
+            name = (r.get("obligation_name") or "").lower()
+            desc = (r.get("description") or "").lower()
+            # simple keyword overlap
+            words = set(re.findall(r"\b\w{5,}\b", reg_lower))
+            matches = sum(1 for w in words if w in name or w in desc)
+            if matches >= 2:
+                affected.append({
+                    "id": r.get("obligation_id", ""),
+                    "name": r.get("obligation_name", ""),
+                    "reason": "Keyword overlap with regulation text",
+                    "action": "Review obligation against new requirements",
+                    "urgency": "Short-term",
+                })
+        result = {
+            "impact_summary": "AI analysis temporarily unavailable. Keyword-based matching shown below.",
+            "risk_level": "High" if len(affected) >= 3 else "Medium",
+            "affected_obligations": affected[:8],
+            "new_obligations": [],
+            "recommendations": [
+                "Review the regulation text against all Critical obligations",
+                "Consult with legal team on compliance timeline",
+                "Update obligation register if new requirements are confirmed",
+            ],
+        }
+
+    return result
+
+
+# ── ESG Disclosure endpoint ───────────────────────────────────────────────────
+
+@router.get("/esg-disclosure")
+def esg_disclosure(market: str = Query("AU"), standard: str = Query("ASX")):
+    """Return emissions data pre-formatted for ASX/SGX ESG disclosure templates."""
+    s = store.get_store()
+    emi = s.get("emissions_data", pd.DataFrame())
+    period = "FY2023–24"
+
+    if not emi.empty and "market" in emi.columns:
+        memi = emi[emi["market"] == market].copy()
+        for col in ("scope1_emissions_tco2e", "scope2_emissions_tco2e", "scope3_emissions_tco2e"):
+            if col in memi.columns:
+                memi[col] = pd.to_numeric(memi[col], errors="coerce").fillna(0)
+    else:
+        memi = pd.DataFrame()
+
+    total_s1 = float(memi["scope1_emissions_tco2e"].sum()) if not memi.empty else 0
+    total_s2 = float(memi["scope2_emissions_tco2e"].sum()) if not memi.empty and "scope2_emissions_tco2e" in memi.columns else 0
+    total_s3 = float(memi["scope3_emissions_tco2e"].sum()) if not memi.empty and "scope3_emissions_tco2e" in memi.columns else 0
+    total_all = total_s1 + total_s2 + total_s3
+
+    entity_breakdown = []
+    if not memi.empty and "corporation_name" in memi.columns:
+        grp = memi.groupby("corporation_name", as_index=False).agg(
+            scope1=("scope1_emissions_tco2e", "sum"),
+            scope2=("scope2_emissions_tco2e", "sum") if "scope2_emissions_tco2e" in memi.columns else ("scope1_emissions_tco2e", "sum"),
+        ).sort_values("scope1", ascending=False)
+        for _, row in grp.iterrows():
+            entity_breakdown.append({
+                "entity": row["corporation_name"],
+                "scope1_tco2e": round(float(row["scope1"])),
+                "scope2_tco2e": round(float(row.get("scope2", 0))),
+                "scope3_tco2e": 0,
+                "total_tco2e": round(float(row["scope1"]) + float(row.get("scope2", 0))),
+            })
+
+    if standard.upper() == "ASX":
+        template = {
+            "standard": "ASX Climate-Related Financial Disclosures (ASRS 1 & 2)",
+            "mandatory_from": "FY2024–25 (Large entities)",
+            "framework": "IFRS S1/S2 aligned",
+            "reporting_period": period,
+            "sections": {
+                "governance": {
+                    "board_oversight": "Board Sustainability Committee reviews climate risks quarterly",
+                    "management_role": "Chief Compliance Officer owns emissions reporting obligations",
+                },
+                "strategy": {
+                    "climate_risks_identified": ["Safeguard Mechanism baseline tightening", "Carbon price escalation", "Extreme weather — asset impairment"],
+                    "climate_opportunities": ["Renewable PPA lock-in", "ACCU procurement strategy", "DER integration revenue"],
+                    "transition_plan": "4.9% annual baseline reduction target under Safeguard Mechanism",
+                },
+                "risk_management": {
+                    "process": "Quarterly emissions audit against Safeguard baselines; board-level escalation for breach risk",
+                    "integration": "Embedded in enterprise risk register as Category 1 (regulatory) risk",
+                },
+                "metrics_and_targets": {
+                    "scope1_tco2e": round(total_s1),
+                    "scope2_tco2e": round(total_s2),
+                    "scope3_tco2e": round(total_s3),
+                    "total_tco2e": round(total_all),
+                    "reporting_period": period,
+                    "baseline_year": "2023–24",
+                    "target": "Net zero by 2050; 43% reduction by 2030 (per Safeguard Mechanism trajectory)",
+                    "intensity_metric": f"{round(total_s1/1e6, 2)} Mt CO2-e total Scope 1",
+                },
+            },
+            "entity_breakdown": entity_breakdown[:10],
+        }
+    else:  # SGX
+        template = {
+            "standard": "SGX Mandatory Climate Reporting (SGX-ST Listing Rules 711A/B)",
+            "mandatory_from": "FY2023 (Large issuers)",
+            "framework": "TCFD-aligned, transitioning to ISSB S2",
+            "reporting_period": period,
+            "sections": {
+                "governance": {
+                    "board_oversight": "Board Risk Committee has oversight of climate-related risks",
+                    "management_role": "CEO-level accountability; quarterly climate risk updates",
+                },
+                "strategy": {
+                    "scenarios_assessed": ["1.5°C transition scenario", "2°C physical risk scenario", "Business as usual 4°C"],
+                    "material_risks": ["Carbon pricing exposure", "Regulatory non-compliance", "Transition asset risk"],
+                    "resilience": "Portfolio stress-tested under IEA Net Zero 2050 scenario",
+                },
+                "risk_management": {
+                    "identification": "Annual materiality assessment; sector-specific energy transition risk framework",
+                    "assessment": "Quantitative carbon price sensitivity analysis ($25–$150/tCO2-e)",
+                    "integration": "Integrated into Enterprise Risk Management framework",
+                },
+                "metrics_and_targets": {
+                    "scope1_tco2e": round(total_s1),
+                    "scope2_tco2e": round(total_s2),
+                    "scope3_tco2e": round(total_s3),
+                    "total_ghg_tco2e": round(total_all),
+                    "reporting_period": period,
+                    "target": "Net zero Scope 1+2 by 2050; 50% intensity reduction by 2030",
+                    "carbon_credits_used": 0,
+                    "internal_carbon_price_sgd": 35,
+                },
+            },
+            "entity_breakdown": entity_breakdown[:10],
+        }
+
+    return template
 
 
 # ── Chat endpoints ────────────────────────────────────────────────────────────

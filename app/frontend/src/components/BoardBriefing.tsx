@@ -202,6 +202,43 @@ export default function BoardBriefing({ visible, onClose, market = "AU", activeM
     }
   };
 
+  const handlePrint = () => {
+    const content = document.getElementById("briefing-content");
+    if (!content) return;
+    const win = window.open("", "_blank", "width=900,height=700");
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head>
+      <title>Board Compliance Briefing — ${marketLabel}</title>
+      <style>
+        body { font-family: Georgia, serif; font-size: 13px; color: #1a1a2e; margin: 40px; background: #fff; }
+        h1 { font-size: 22px; font-weight: bold; margin-bottom: 4px; }
+        h2 { font-size: 15px; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 6px; margin-top: 28px; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 12px; }
+        th { text-align: left; padding: 6px 10px; background: #f0f2f7; font-weight: 600; border: 1px solid #ddd; }
+        td { padding: 5px 10px; border: 1px solid #ddd; vertical-align: top; }
+        .briefing-summary-grid { display: flex; gap: 12px; margin: 16px 0; }
+        .briefing-summary-card { flex: 1; padding: 12px 16px; border: 1px solid #ddd; border-radius: 6px; }
+        .briefing-summary-label { font-size: 11px; font-weight: 600; text-transform: uppercase; color: #666; }
+        .briefing-summary-value { font-size: 24px; font-weight: 800; margin: 4px 0; }
+        .briefing-actions { margin: 12px 0; }
+        .briefing-action-item { display: flex; gap: 12px; padding: 10px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 8px; }
+        .briefing-action-priority { font-weight: 800; min-width: 24px; color: #e53e3e; }
+        .briefing-narrative-block { margin: 16px 0; padding: 14px; background: #f9fafb; border-left: 3px solid #4f8ff7; border-radius: 4px; }
+        .briefing-narrative-label { font-size: 11px; font-weight: 700; color: #4f8ff7; text-transform: uppercase; margin-bottom: 8px; }
+        .briefing-footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #ddd; font-size: 11px; color: #888; }
+        .severity { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+        .severity-critical { background: #fee2e2; color: #dc2626; }
+        .severity-warning { background: #fef3c7; color: #d97706; }
+        .severity-info { background: #dbeafe; color: #2563eb; }
+        .severity-low { background: #d1fae5; color: #059669; }
+        @media print { body { margin: 20px; } }
+      </style>
+    </head><body>${content.innerHTML}</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 300);
+  };
+
   /* Derived values from API data */
   const criticalCount = data?.risk_distribution.find(
     (r) => r.risk_rating.toLowerCase() === "critical"
@@ -233,6 +270,9 @@ export default function BoardBriefing({ visible, onClose, market = "AU", activeM
               title="Regenerate AI narrative"
             >
               {narrativeLoading ? "Generating…" : "Regenerate"}
+            </button>
+            <button className="briefing-btn" onClick={handlePrint} title="Export as PDF via browser print">
+              ↓ PDF
             </button>
             <button className="briefing-btn" onClick={handleCopy}>
               {copied ? "Copied" : "Copy"}

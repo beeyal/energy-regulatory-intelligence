@@ -101,15 +101,22 @@ def _load_au_emissions() -> pd.DataFrame:
         ("Tilt Renewables", "Snowtown Wind Farm 2", "SA", "Wind", 3_800),
         ("AGL Energy", "Silverton Wind Farm", "NSW", "Wind", 4_200),
     ]
+    # Scope 3 multipliers by fuel type (upstream + downstream supply chain)
+    scope3_multipliers = {"Coal": 0.35, "Gas": 0.28, "Hydro": 0.04, "Wind": 0.02}
     rows = []
     for corp, fac, state, fuel, base_s1 in companies:
+        s1 = round(base_s1 * rng.uniform(0.92, 1.08))
+        s2 = round(base_s1 * 0.05 * rng.uniform(0.8, 1.2))
+        s3_mult = scope3_multipliers.get(fuel, 0.15)
+        s3 = round(s1 * s3_mult * rng.uniform(0.85, 1.15))
         rows.append({
             "market": "AU",
             "corporation_name": corp,
             "facility_name": fac,
             "state": state,
-            "scope1_emissions_tco2e": round(base_s1 * rng.uniform(0.92, 1.08)),
-            "scope2_emissions_tco2e": round(base_s1 * 0.05 * rng.uniform(0.8, 1.2)),
+            "scope1_emissions_tco2e": s1,
+            "scope2_emissions_tco2e": s2,
+            "scope3_emissions_tco2e": s3,
             "net_energy_consumed_gj": round(base_s1 * 0.012 * rng.uniform(0.9, 1.1)),
             "electricity_production_mwh": round(base_s1 * 0.00035) if fuel not in ("Wind", "Hydro") else round(base_s1 * 3),
             "primary_fuel_source": fuel,
@@ -173,6 +180,7 @@ _UC_COERCIONS: dict[str, dict[str, str]] = {
     "emissions_data": {
         "scope1_emissions_tco2e": "float",
         "scope2_emissions_tco2e": "float",
+        "scope3_emissions_tco2e": "float",
         "net_energy_consumed_gj": "float",
         "electricity_production_mwh": "float",
     },

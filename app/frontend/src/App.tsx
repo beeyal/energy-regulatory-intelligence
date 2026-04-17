@@ -6,14 +6,20 @@ import MarketNotices from "./components/MarketNotices";
 import EnforcementTracker from "./components/EnforcementTracker";
 import ObligationRegister from "./components/ObligationRegister";
 import ComplianceGaps from "./components/ComplianceGaps";
+import RegulatoryHorizon from "./components/RegulatoryHorizon";
 import ChatPanel from "./components/ChatPanel";
 import OnboardingTour, { useOnboarding } from "./components/OnboardingTour";
 import FreshnessBadge from "./components/FreshnessBadge";
+import MarketPosture from "./components/MarketPosture";
+import ImpactAnalysis from "./components/ImpactAnalysis";
+import ESGDisclosure from "./components/ESGDisclosure";
+import PeerBenchmark from "./components/PeerBenchmark";
+import NotificationBell from "./components/NotificationBell";
 import { useTheme } from "./hooks/useTheme";
 import { RegionProvider, useRegion } from "./context/RegionContext";
 import RegionSwitcher from "./components/RegionSwitcher";
 
-type Tab = "risk" | "emissions" | "forecast" | "notices" | "enforcement" | "obligations" | "gaps";
+type Tab = "risk" | "horizon" | "emissions" | "forecast" | "notices" | "enforcement" | "obligations" | "gaps" | "markets" | "impact" | "esg" | "benchmark";
 
 interface Metadata {
   tables?: Record<string, string | number>;
@@ -21,25 +27,35 @@ interface Metadata {
   last_ingested_at?: Record<string, string>;
 }
 
-const TABS: { id: Tab; label: string }[] = [
+const TABS: { id: Tab; label: string; badge?: string }[] = [
   { id: "risk", label: "Risk Overview" },
+  { id: "markets", label: "Markets", badge: "NEW" },
+  { id: "horizon", label: "Horizon" },
   { id: "gaps", label: "Compliance Insights" },
   { id: "emissions", label: "Emissions" },
   { id: "forecast", label: "Safeguard Forecast" },
   { id: "notices", label: "Market Notices" },
   { id: "enforcement", label: "Enforcement" },
   { id: "obligations", label: "Obligations" },
+  { id: "benchmark", label: "Benchmarking" },
+  { id: "impact", label: "Impact Analysis", badge: "AI" },
+  { id: "esg", label: "ESG Disclosure" },
 ];
 
 function TabContent({ tab }: { tab: Tab }) {
   switch (tab) {
     case "risk": return <RiskHeatMap />;
+    case "markets": return <MarketPosture />;
+    case "horizon": return <RegulatoryHorizon />;
     case "emissions": return <EmissionsOverview />;
     case "forecast": return <EmissionsForecaster />;
     case "notices": return <MarketNotices />;
     case "enforcement": return <EnforcementTracker />;
     case "obligations": return <ObligationRegister />;
     case "gaps": return <ComplianceGaps />;
+    case "benchmark": return <PeerBenchmark />;
+    case "impact": return <ImpactAnalysis />;
+    case "esg": return <ESGDisclosure />;
   }
 }
 
@@ -50,6 +66,7 @@ function TabWrapper({ tab, metadata }: { tab: Tab; metadata: Metadata | null }) 
     emissions: "emissions_data",
     notices: "market_notices",
     gaps: "compliance_insights",
+    esg: "emissions_data",
   };
   const tableKey = tableMap[tab];
   const ts = tableKey ? metadata?.last_ingested_at?.[tableKey] : undefined;
@@ -93,6 +110,7 @@ function AppInner() {
       <div className="app-header">
         <div className="header-actions">
           <RegionSwitcher />
+          <NotificationBell />
           <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle theme">
             {theme === "dark" ? "☀ Light" : "◑ Dark"}
           </button>
@@ -147,8 +165,20 @@ function AppInner() {
             key={tab.id}
             className={`tab-btn ${activeTab === tab.id ? "active" : ""}`}
             onClick={() => setActiveTab(tab.id)}
+            style={{ position: "relative" }}
           >
             {tab.label}
+            {tab.badge && (
+              <span style={{
+                position: "absolute", top: -4, right: -4,
+                fontSize: 8, fontWeight: 800, padding: "1px 4px",
+                background: "var(--accent-green)", color: "#000",
+                borderRadius: 4, letterSpacing: "0.04em",
+                lineHeight: 1.4,
+              }}>
+                {tab.badge}
+              </span>
+            )}
           </button>
         ))}
       </nav>

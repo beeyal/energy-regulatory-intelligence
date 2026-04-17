@@ -32,8 +32,18 @@ interface CompanyForecast {
   first_breach_year: number | null;
 }
 
+interface HeadroomItem {
+  company: string;
+  current_tco2e: number;
+  baseline_tco2e: number;
+  headroom_tco2e: number;
+  headroom_pct: number;
+  status: "safe" | "warning" | "breach";
+}
+
 interface ForecastData {
   forecasts: CompanyForecast[];
+  headroom: HeadroomItem[];
   safeguard_params: {
     baseline_decline_rate: number;
     accu_price_aud: number;
@@ -76,6 +86,7 @@ export default function EmissionsForecaster() {
     const lastYear = f.trajectory[f.trajectory.length - 1];
     return sum + (lastYear?.shortfall_cost_aud || 0);
   }, 0);
+  const headroom = data?.headroom || [];
 
   if (loading) return <LoadingPage />;
 
@@ -236,6 +247,66 @@ export default function EmissionsForecaster() {
             </div>
           </div>
         </>
+      )}
+
+      {headroom.length > 0 && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="card-header">
+            <h2>Compliance Headroom — Current Year</h2>
+            <span className="badge" style={{ background: "rgba(16,185,129,0.15)", color: "#10B981" }}>
+              {headroom.filter((h) => h.status === "safe").length} safe · {headroom.filter((h) => h.status === "warning").length} at risk · {headroom.filter((h) => h.status === "breach").length} breach
+            </span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {headroom.map((h) => {
+              const safeColor = "#10B981";
+              const warnColor = "var(--accent-amber)";
+              const breachColor = "var(--accent-red)";
+              const barColor = h.status === "safe" ? safeColor : h.status === "warning" ? warnColor : breachColor;
+              const fillPct = Math.max(0, Math.min(100, h.status === "breach"
+                ? 100
+                : 100 - Math.abs(h.headroom_pct)));
+              return (
+                <div key={h.company} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 180, fontSize: 12, color: "var(--text-secondary)", textAlign: "right", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {h.company.length > 22 ? h.company.slice(0, 20) + "…" : h.company}
+                  </div>
+                  <div style={{ flex: 1, background: "var(--bg-panel)", borderRadius: 4, height: 18, position: "relative", overflow: "hidden" }}>
+                    <div style={{
+                      width: `${fillPct}%`,
+                      height: "100%",
+                      background: barColor,
+                      opacity: 0.75,
+                      borderRadius: 4,
+                      transition: "width 0.6s ease",
+                    }} />
+                    {h.status === "breach" && (
+                      <div style={{
+                        position: "absolute", inset: 0,
+                        background: "repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(0,0,0,0.15) 4px, rgba(0,0,0,0.15) 8px)",
+                        borderRadius: 4,
+                      }} />
+                    )}
+                  </div>
+                  <div style={{ width: 90, fontSize: 12, flexShrink: 0, textAlign: "right" }}>
+                    <span style={{ color: barColor, fontWeight: 600 }}>
+                      {h.status === "breach" ? "−" : "+"}{formatNum(Math.abs(h.headroom_tco2e))} t
+                    </span>
+                  </div>
+                  <div style={{ width: 70, fontSize: 11, flexShrink: 0 }}>
+                    <span className={`badge ${h.status === "safe" ? "severity-info" : h.status === "warning" ? "severity-warning" : "severity-critical"}`}
+                      style={{ fontSize: 10 }}>
+                      {h.status === "breach" ? "BREACH" : h.status === "warning" ? "AT RISK" : "SAFE"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: 12, fontSize: 11, color: "var(--text-muted)" }}>
+            Bar shows % of baseline consumed. Hatched = breach threshold exceeded. AT RISK = &lt;15% headroom remaining.
+          </div>
+        </div>
       )}
 
       <div className="card" style={{ marginTop: 16, padding: "12px 16px", background: "rgba(245, 158, 11, 0.08)", border: "1px solid rgba(245, 158, 11, 0.2)", borderRadius: 8 }}>

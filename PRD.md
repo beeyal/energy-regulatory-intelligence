@@ -587,7 +587,60 @@ Root causes:
 
 ---
 
-## 11. Roadmap
+## 11. Competitive Gap Analysis — APJ Market
+
+*Research conducted April 2026 against incumbent platforms: Regology, FinregE, VComply, S&P Global Commodity Insights, Wood Mackenzie, AssurX, Certrec, NAVEX, EnergyCAP, Energy One.*
+
+### 11.1 Strategic Position
+
+No commercial platform provides integrated compliance monitoring across multiple APJ energy markets. The incumbents are US/EU-centric; the regional players (Energy One, AEMO dashboards) are single-market data portals, not compliance tools. This is the primary market opportunity.
+
+### 11.2 P0 Gaps — Table Stakes (Missing from MVP)
+
+| ID | Gap | Benchmark | Implementation |
+|----|-----|-----------|---------------|
+| G-01 | **Obligation deadline aging** | Certrec CATS shows days-to-deadline with overdue indicators; Ashurst OMS tracks obligation change history | Countdown clock per obligation; overdue badge (negative days); urgency bands at 7/14/30/60 days; pulsing red for overdue items |
+| G-02 | **Regulatory horizon scanning** | Regology AI agents monitor regulatory announcements in real-time; FinregE horizon scanning module | New "Horizon" tab fed from market notices + obligation register; categorise as New Obligation / Enforcement / Policy Change / Grid Alert; unread count badge |
+| G-03 | **Report / PDF export** | Every enterprise GRC tool (SAI360, MetricStream, NAVEX) exports PDF/Excel board packs | Board Briefing "Print PDF" via browser print API; Obligation Register CSV (done); Enforcement Tracker CSV export |
+| G-04 | **Per-obligation risk score** | MetricStream computes numeric risk scores (0-100) from penalty × frequency × recency; SAI360 KPI dashboards | `risk_score = penalty_score(0-40) + frequency_score(0-30) + severity_score(0-30)`; shown as score badge + bar per obligation |
+
+### 11.3 P1 Gaps — High Value, Differentiated
+
+| ID | Gap | Benchmark | Implementation |
+|----|-----|-----------|---------------|
+| G-05 | **Cross-market compliance posture** | S&P Global shows 19 APAC markets side-by-side; no energy compliance tool does APJ multi-market | New `MarketComparisonView` — 8-market grid showing critical obligation count, pending enforcement, emissions % vs. target |
+| G-06 | **Predictive deadline risk** | Certrec CATS predicts "at risk" obligations from historical patterns; MetricStream predictive risk | Flag obligations due within 30/60/90 days; trajectory warning if trend continues; "at risk" heuristic based on obligation complexity + frequency |
+| G-07 | **Emissions vs. regulatory target** | EnergyCAP Carbon Hub shows scope 1/2 trajectory vs. allowable limits; Sweep CSRD-ready | Overlay market carbon intensity targets on EmissionsForecaster; show compliance headroom as % of baseline; colour-code near-breach companies |
+| G-08 | **DER / CDR obligations (AU)** | No commercial platform has this — genuine differentiator | Add CDR, RRO, AEMC DER compliance obligations to AU obligation register seed data; tag with "Emerging" flag |
+| G-09 | **Scope 3 emissions** | EnergyCAP Carbon Hub, Sweep, Nasdaq Metrio track Scope 1/2/3 | Extend emissions data model + UC table; add Scope 3 column; show value chain breakdown in EmissionsOverview |
+| G-10 | **Enforcement CSV export** | All enterprise tools offer data export | Add ↓ CSV button to EnforcementTracker (matching ObligationRegister pattern) |
+
+### 11.4 P2 Gaps — Medium Term
+
+| ID | Gap | Strategic Value |
+|----|-----|----------------|
+| G-11 | **Multilingual UI (JP/KO/TH)** | Blocks enterprise adoption in Japan, South Korea, Thailand; METI/OCCTO documents are Japanese-only |
+| G-12 | **In-app obligation assignment** | Ashurst OMS killer feature — assigns owner, tracks status, notes; turns read-only into workflow tool |
+| G-13 | **Live AEMO API integration** | Real-time NEM data is a moat; Energy One (NEM InfoServer) is the only real-time feed today |
+| G-14 | **AI obligation extraction from PDFs** | FinregE RIG core differentiator — upload a new regulation, AI extracts obligations; eliminates manual curation |
+| G-15 | **Audit trail per obligation** | Required for any regulated customer to use in production; SAI360, MetricStream, AssurX all have this |
+| G-16 | **Peer benchmarking** | MetricStream supports anonymised cross-client comparison; no APJ energy peer group exists yet |
+| G-17 | **SGX / ASX ESG disclosure output** | SGX requires Scope 1+2 from FY2025; ASX mandatory from FY2025; no platform pre-populates APAC templates |
+| G-18 | **AI regulatory change impact analysis** | Regology AI: "this proposed rule affects you because…"; FinregE RIG cross-references against obligation register |
+| G-19 | **Microsoft Teams / email notifications** | Deadline and enforcement alerts via Teams adaptive cards; every enterprise GRC tool has this |
+| G-20 | **Multi-tenant support** | Required for consulting firms serving multiple energy clients; Regology, FinregE support this natively |
+
+### 11.5 Competitive Differentiators (Maintain and Extend)
+
+1. **Only APJ multi-market energy compliance platform** — 8 markets, no incumbent covers this
+2. **Databricks-native** — Unity Catalog governance, Genie Space, MLflow tracing; no competitor runs on Databricks
+3. **Safeguard Mechanism modelling** — unique to Australian market; no competitor models declining baselines
+4. **AI copilot with market-specific context** — Regology/FinregE lack AEMO/AER/EMA training data
+5. **Sub-$50K deployment** — vs $200K-$2M for SAI360/MetricStream; democratises for mid-market energy
+
+---
+
+## 12. Roadmap
 
 ### v1.0 (Current — Buildathon MVP)
 
@@ -604,24 +657,52 @@ Root causes:
 - MLflow Tracing
 - Genie Space
 
-### v2.0 (Q3 2026)
+### v1.1 (Q2 2026 — P0 Gap Closure)
 
+*Addresses G-01 through G-04 + G-10 from competitive gap analysis.*
+
+- **G-01** Obligation deadline aging — overdue indicators, countdown urgency bands, pulsing alerts
+- **G-02** Regulatory Horizon Scanning tab — market notices categorised as Enforcement / Policy / Grid Alert; unread count
+- **G-03** Board Briefing PDF export — browser print API; Enforcement CSV export
+- **G-04** Per-obligation risk score — 0-100 composite score (penalty + frequency + severity); score badge + bar in Obligation Register
+- **G-10** Enforcement CSV export — matching ObligationRegister export pattern
+
+### v1.2 (Q3 2026 — P1 Differentiation)
+
+*Addresses G-05 through G-09 from competitive gap analysis.*
+
+- **G-05** Cross-market compliance posture view — 8-market grid dashboard
+- **G-06** Predictive deadline risk — at-risk obligations flagging with confidence indicator
+- **G-07** Emissions vs. regulatory target — carbon headroom overlay on Safeguard Forecaster
+- **G-08** DER / CDR obligations (AU) — emerging obligation categories in register
+- **G-09** Scope 3 emissions — extend data model; value chain breakdown in EmissionsOverview
+
+### v2.0 (Q4 2026 — P2 Enterprise)
+
+*Addresses G-11 through G-20 from competitive gap analysis.*
+
+- **G-11** Multilingual UI — Japanese, Korean, Thai (i18n framework)
+- **G-12** In-app obligation assignment — owner, status, notes; workflow tracker
+- **G-13** Live AEMO API integration — real-time NEM market data feed
+- **G-14** AI obligation extraction from PDFs — upload regulation → auto-extract obligations
+- **G-15** Audit trail per obligation — change log, evidence attachments
+- **G-16** Peer benchmarking — anonymised cross-client compliance comparison
+- **G-17** SGX / ASX ESG disclosure output — pre-populated APAC disclosure templates
+- **G-18** AI regulatory change impact analysis — "this rule affects you because…"
+- **G-19** Teams / email notifications — deadline alerts, enforcement notifications
+- **G-20** Multi-tenant support — consultancy deployments serving multiple clients
 - Vector Search RAG over full NER/NGER Act corpus (3,000+ pages)
 - DLT pipelines for automated data refresh (Bronze > Silver > Gold)
 - Lakebase for low-latency serving (<10ms)
-- ML enforcement prediction model (which obligations will AER scrutinise next)
-- AEMC rule change radar with automated impact analysis
-- Cross-regulator obligation dependency mapper
-- PDF export for Board briefings
-- Email/Teams notification for regulatory changes
+- ML enforcement prediction model
 - SAP integration via Lakeflow Connect
-- Multi-tenant support for consultancies serving multiple energy clients
 
-### v3.0 (Q1 2027)
+### v3.0 (Q2 2027 — Market Expansion)
 
 - Automated compliance gap remediation recommendations
 - Regulatory submission drafting (AI-generated consultation responses)
-- Peer benchmarking dashboard (anonymised cross-client data)
 - Climate disclosure (AASB S2) report generator
 - Real-time AEMO dispatch compliance monitoring
 - Integration with Celonis/Signavio for process mining correlation
+- India state-regulator module (28 SERCs + CERC unified view)
+- South Korea power supervisory agency module (when operational)
