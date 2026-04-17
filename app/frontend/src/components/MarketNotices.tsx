@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useApi } from "../hooks/useApi";
 import { LoadingPage } from "./LoadingSkeleton";
 import EmptyState from "./EmptyState";
@@ -40,12 +40,25 @@ export default function MarketNotices() {
   const [noticeType, setNoticeType] = useState("");
   const [region, setRegion] = useState("");
   const [page, setPage] = useState(0);
+  const [livePulse, setLivePulse] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
 
   const params: Record<string, string> = { limit: "200" };
   if (noticeType) params.notice_type = noticeType;
   if (region) params.region = region;
 
   const { data, loading, error, refetch } = useApi<NoticesData>("/api/market-notices", params);
+
+  // G-13: Live data simulation — auto-refresh every 60s + pulse animation on refresh
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refetch();
+      setLastRefresh(new Date());
+      setLivePulse(true);
+      setTimeout(() => setLivePulse(false), 1200);
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [refetch]);
 
   const paginatedRecords = useMemo(() => {
     if (!data?.records) return [];
@@ -96,8 +109,23 @@ export default function MarketNotices() {
         <div className="card-header">
           <h2>AEMO Market Notices</h2>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{
+              display: "flex", alignItems: "center", gap: 5,
+              padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700,
+              background: "rgba(16,185,129,0.12)",
+              color: "#10b981",
+              border: "1px solid rgba(16,185,129,0.25)",
+            }}>
+              <span style={{
+                width: 6, height: 6, borderRadius: "50%",
+                background: "#10b981",
+                display: "inline-block",
+                animation: livePulse ? "pulse 0.6s ease" : "pulse 2s infinite",
+              }} />
+              LIVE · {lastRefresh.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+            </span>
             <span className="badge" style={{ background: "rgba(79,143,247,0.15)", color: "var(--accent-blue)" }}>
-              NEMWeb Live Data
+              NEMWeb
             </span>
             <button
               onClick={() => downloadCsv(data?.records ?? [], `market-notices-${new Date().toISOString().slice(0, 10)}.csv`)}

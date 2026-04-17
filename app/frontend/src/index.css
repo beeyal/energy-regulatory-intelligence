@@ -390,13 +390,20 @@ body {
   -webkit-backdrop-filter: blur(20px);
   padding: 0 28px;
   border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.tab-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-btn {
   background: none;
   border: none;
   color: var(--text-muted);
-  padding: 12px 18px;
+  padding: 12px 14px;
   font-family: inherit;
   font-size: 13px;
   font-weight: 500;
@@ -404,6 +411,8 @@ body {
   border-bottom: 2px solid transparent;
   transition: all 0.2s ease;
   position: relative;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tab-btn:hover {

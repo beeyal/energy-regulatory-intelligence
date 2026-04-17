@@ -393,3 +393,11 @@ def scalar(table: str, market: str = "AU", agg: dict[str, str] | None = None) ->
 def get_store() -> dict[str, pd.DataFrame]:
     _ensure_loaded()
     return _store
+
+
+def force_reload() -> dict[str, int]:
+    """Force a full reload of the in-memory data store. Returns row counts per table."""
+    global _store, _loaded
+    _loaded = False
+    _load_all()
+    return {name: len(df) for name, df in _store.items()}

@@ -1648,6 +1648,110 @@ def esg_disclosure(market: str = Query("AU"), standard: str = Query("ASX")):
     return template
 
 
+# ── Obligation extraction endpoint ───────────────────────────────────────────
+
+class ExtractionRequest(BaseModel):
+    text: str
+    market: str = "AU"
+
+
+@router.post("/extract-obligations")
+def extract_obligations(req: ExtractionRequest):
+    """AI obligation extraction — converts regulation text into structured obligation records."""
+    text = req.text[:5000]
+    market = req.market
+
+    try:
+        region = get_region(market)
+        market_name = region.name
+        regulators = ", ".join(r.code for r in region.regulators)
+    except Exception:
+        market_name = market
+        regulators = "CER, AER, AEMC, AEMO, ESV"
+
+    prompt = (
+        f"You are a regulatory compliance analyst for the {market_name} energy market. "
+        f"Extract all compliance obligations from the following regulation text.\n\n"
+        f"For each obligation found, create a structured record. "
+        f"Use these regulatory bodies where relevant: {regulators}.\n\n"
+        f"Categories available: Market, Consumer, Safety, Environment, Technical, Financial\n"
+        f"Risk ratings: Critical ($5M+ penalty), High ($1M+), Medium ($100K+), Low (under $100K)\n"
+        f"Frequency options: daily, weekly, monthly, quarterly, bi-annual, annual, as required\n\n"
+        f"### Regulation Text\n{text}\n\n"
+        f"Return a JSON array (raw JSON, no markdown) where each element has exactly:\n"
+        f'{{"obligation_name": "...", '
+        f'"regulatory_body": "...", '
+        f'"category": "...", '
+        f'"risk_rating": "Critical|High|Medium|Low", '
+        f'"penalty_max_aud": <number>, '
+        f'"frequency": "...", '
+        f'"description": "one sentence", '
+        f'"key_requirements": "comma separated list", '
+        f'"source_legislation": "act/rule reference from the text"}}'
+    )
+
+    try:
+        from .llm import _get_openai_client
+        from .config import get_model_endpoint
+        client = _get_openai_client()
+        resp = client.chat.completions.create(
+            model=get_model_endpoint(),
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=2000,
+            temperature=0.2,
+        )
+        raw = resp.choices[0].message.content or "[]"
+        raw = re.sub(r"^```(?:json)?\s*", "", raw.strip())
+        raw = re.sub(r"\s*```$", "", raw.strip())
+        obligations = json.loads(raw)
+        if not isinstance(obligations, list):
+            obligations = [obligations]
+    except Exception as e:
+        logger.error(f"Obligation extraction LLM error: {e}")
+        # Rule-based fallback: scan for dollar penalties and obligation keywords
+        obligations = []
+        lines = [l.strip() for l in text.split("\n") if len(l.strip()) > 30]
+        penalty_re = re.compile(r"\$[\d,]+(?:\s*million)?", re.IGNORECASE)
+        must_re = re.compile(r"\b(must|shall|required to|obligated to|must not)\b", re.IGNORECASE)
+        for line in lines[:20]:
+            if must_re.search(line):
+                penalty_match = penalty_re.search(text)
+                obligations.append({
+                    "obligation_name": line[:80],
+                    "regulatory_body": regulators.split(",")[0].strip(),
+                    "category": "Market",
+                    "risk_rating": "High",
+                    "penalty_max_aud": 1_000_000,
+                    "frequency": "as required",
+                    "description": line[:120],
+                    "key_requirements": line[:100],
+                    "source_legislation": "Extracted from uploaded text",
+                })
+            if len(obligations) >= 5:
+                break
+
+    # Assign provisional IDs
+    for i, obl in enumerate(obligations):
+        obl["obligation_id"] = f"EXTRACTED-{i+1:03d}"
+        obl["market"] = market
+        obl["status"] = "Pending Review"
+
+    return {"obligations": obligations, "count": len(obligations)}
+
+
+# ── Data management endpoints ─────────────────────────────────────────────────
+
+@router.post("/admin/reload-data")
+def reload_data():
+    """Force reload the in-memory data store from source (UC or synthetic)."""
+    try:
+        counts = store.force_reload()
+        return {"status": "ok", "tables": counts, "total_rows": sum(counts.values())}
+    except Exception as e:
+        logger.error(f"Data reload failed: {e}")
+        return {"status": "error", "message": str(e)}
+
+
 # ── Chat endpoints ────────────────────────────────────────────────────────────
 
 @router.post("/chat/stream")
