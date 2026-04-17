@@ -105,10 +105,23 @@ export default function MarketRadar() {
         </RadarChart>
       </ResponsiveContainer>
 
-      <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4, textAlign: "center" }}>
-        Highest risk: <span style={{ color: riskColor(hotMarket.score), fontWeight: 600 }}>
-          {hotMarket.flag} {hotMarket.name} ({hotMarket.score})
-        </span>
+      {/* Market score breakdown */}
+      <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+        {[...chartData].sort((a, b) => b.score - a.score).map((m) => (
+          <div key={m.market} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 11, width: 22, textAlign: "center" }}>{m.flag}</span>
+            <span style={{ fontSize: 11, color: "var(--text-secondary)", width: 28, flexShrink: 0 }}>{m.market}</span>
+            <div style={{ flex: 1, height: 5, background: "var(--border)", borderRadius: 3, overflow: "hidden" }}>
+              <div style={{
+                height: "100%", width: `${m.score}%`,
+                background: riskColor(m.score), borderRadius: 3,
+              }} />
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 600, color: riskColor(m.score), width: 26, textAlign: "right" }}>
+              {m.score}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
